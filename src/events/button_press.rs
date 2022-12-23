@@ -6,6 +6,7 @@ pub fn button_press_event(window: &gtk::ApplicationWindow, event: &gdk::EventBut
     RUNTIME_DATA.with(|runtime_data| {
         if event.event_type() == gdk::EventType::ButtonPress {
             let mut runtime_data = runtime_data.borrow_mut();
+            // Refresh the selection overlays of all windows
             for (_, window_info) in &runtime_data.windows {
                 window_info.selection_overlay.queue_draw();
             }
@@ -14,6 +15,9 @@ pub fn button_press_event(window: &gtk::ApplicationWindow, event: &gdk::EventBut
             let transformed_pos = event
                 .position()
                 .to_global(&runtime_data.windows[window].monitor);
+
+            // Ungrab the device to avoid causing issues with focus grabbind
+            event.seat().unwrap().ungrab();
 
             // Copy this locally due to the later mutable borrow
             let radius = runtime_data.config.handle_radius;
