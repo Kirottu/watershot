@@ -8,7 +8,7 @@ pub struct RuntimeData {
     pub selection: Selection,
     pub args: Args,
     pub config: Config,
-    pub area_rect: Rect,
+    pub area_rect: Option<Rect>,
     pub windows: HashMap<gtk::ApplicationWindow, WindowInfo>,
 }
 

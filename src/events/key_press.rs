@@ -52,8 +52,8 @@ pub fn key_press_event(
                 window.close();
             }
             // Convert the coordinate space to one compatible with the source image
-            rect.x -= runtime_data.area_rect.x;
-            rect.y -= runtime_data.area_rect.y;
+            rect.x -= runtime_data.area_rect.unwrap().x;
+            rect.y -= runtime_data.area_rect.unwrap().y;
 
             // Crop the selection area
             let image = image.borrow_mut().crop(

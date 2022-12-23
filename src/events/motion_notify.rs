@@ -83,7 +83,8 @@ pub fn motion_notify_event(_window: &gtk::ApplicationWindow, event: &gdk::EventM
                             extents.end_x -= x - pos.0;
                             extents.end_y -= y - pos.1;
 
-                            selection.extents = extents.to_rect_clamped(&area).to_extents();
+                            selection.extents =
+                                extents.to_rect_clamped(&area.unwrap()).to_extents();
                         }
                     },
                     None => {

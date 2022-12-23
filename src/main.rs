@@ -26,7 +26,7 @@ thread_local! {
     pub static RUNTIME_DATA: RefCell<RuntimeData> = RefCell::new(RuntimeData {
         selection: Selection::Rectangle(None),
         args: Args::default(),
-        area_rect: Rect::default(),
+        area_rect: None,
         config: Config::load().unwrap_or_default(),
         windows: HashMap::new(),
     });
@@ -105,6 +105,22 @@ fn activate(app: &gtk::Application) {
     });
 
     let image = Rc::new(RefCell::new(image::load_from_memory(&bytes).unwrap()));
+
+    // Create the full display rect first so the monitor coordinates can be
+    // properly mapped to screenshot coordinates in the main monitor loop
+    for i in 0..display.n_monitors() {
+        let monitor = display.monitor(i).unwrap();
+        let rect = monitor.geometry();
+
+        RUNTIME_DATA.with(|runtime_data| {
+            let area_rect = &mut runtime_data.borrow_mut().area_rect;
+            match area_rect {
+                Some(area_rect) => area_rect.extend(&rect.into()),
+                None => *area_rect = Some(rect.into()),
+            }
+        })
+    }
+
     for i in 0..display.n_monitors() {
         let monitor = display.monitor(i).unwrap();
         let window = gtk::ApplicationWindow::new(app);
@@ -126,12 +142,14 @@ fn activate(app: &gtk::Application) {
         let rect = monitor.geometry();
 
         // Crop the image appropriate for the current monitor
-        let window_image = image.borrow_mut().crop(
-            rect.x() as u32,
-            rect.y() as u32,
-            rect.width() as u32,
-            rect.height() as u32,
-        );
+        let window_image = RUNTIME_DATA.with(|runtime_data| {
+            image.borrow_mut().crop(
+                (rect.x() - runtime_data.borrow().area_rect.unwrap().x) as u32,
+                (rect.y() - runtime_data.borrow().area_rect.unwrap().y) as u32,
+                rect.width() as u32,
+                rect.height() as u32,
+            )
+        });
 
         // Create a Pixbuf from it for using in the background widget
         let pixbuf = gdk_pixbuf::Pixbuf::from_bytes(
@@ -180,7 +198,6 @@ fn activate(app: &gtk::Application) {
         RUNTIME_DATA.with(|runtime_data| {
             let mut runtime_data = runtime_data.borrow_mut();
 
-            runtime_data.area_rect.extend(&rect.into());
             runtime_data.windows.insert(
                 window_clone.clone(),
                 WindowInfo {
