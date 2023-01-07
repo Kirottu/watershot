@@ -1,67 +1,88 @@
-use crate::Extents;
+use fontdue::{
+    layout::{CoordinateSystem, Layout, TextStyle},
+    Font,
+};
+use raqote::{DrawOptions, DrawTarget, Image, SolidSource};
 
-// Helper traits
-pub trait Transform<T> {
-    fn to_global(&self, _monitor: &gdk::Monitor) -> T {
-        todo!();
-    }
-    fn to_local(&self, _monitor: &gdk::Monitor) -> T {
-        todo!();
-    }
+use crate::types::{Color, Extents, Rect};
+
+pub trait ToLocal<T> {
+    fn to_local(&self, rect: &Rect) -> T;
 }
 
-impl Transform<(i32, i32)> for (f64, f64) {
-    fn to_global(&self, monitor: &gdk::Monitor) -> (i32, i32) {
-        (
-            self.0 as i32 + monitor.geometry().x(),
-            self.1 as i32 + monitor.geometry().y(),
-        )
-    }
+pub trait ToGlobal<T> {
+    fn to_global(&self, rect: &Rect) -> T;
 }
 
-impl Transform<(f64, f64)> for (i32, i32) {
-    fn to_local(&self, monitor: &gdk::Monitor) -> (f64, f64) {
-        (
-            self.0 as f64 - monitor.geometry().x() as f64,
-            self.1 as f64 - monitor.geometry().y() as f64,
-        )
-    }
+pub trait DistanceTo<T> {
+    fn distance_to(&self, other: &(T, T)) -> T;
 }
 
-impl Transform<(i32, i32)> for (i32, i32) {
-    fn to_global(&self, monitor: &gdk::Monitor) -> (i32, i32) {
-        (
-            self.0 + monitor.geometry().x(),
-            self.1 + monitor.geometry().y(),
-        )
-    }
+pub trait DrawText {
+    fn draw_text(&mut self, x: f32, y: f32, font: &[Font], text: &str, size: f32, color: Color);
 }
 
-impl Transform<Extents> for Extents {
-    fn to_local(&self, monitor: &gdk::Monitor) -> Extents {
-        Self {
-            start_x: self.start_x - monitor.geometry().x(),
-            start_y: self.start_y - monitor.geometry().y(),
-            end_x: self.end_x - monitor.geometry().x(),
-            end_y: self.end_y - monitor.geometry().y(),
+impl DrawText for DrawTarget<&mut [u32]> {
+    fn draw_text(&mut self, x: f32, y: f32, font: &[Font], text: &str, size: f32, color: Color) {
+        let mut layout = Layout::new(CoordinateSystem::PositiveYDown);
+        layout.append(font, &TextStyle::new(text, size, 0));
+
+        let last = layout.glyphs().last().unwrap();
+
+        let total_width = last.width as f32 + last.x;
+        let total_height = layout.height();
+
+        for glyph in layout.glyphs() {
+            let (_, buf) = font[0].rasterize_config(glyph.key);
+
+            let data = buf
+                .into_iter()
+                .map(|coverage| {
+                    SolidSource::from_unpremultiplied_argb(
+                        (coverage as u32 * color.a as u32 / 255) as u8,
+                        color.r,
+                        color.g,
+                        color.b,
+                    )
+                    .to_u32()
+                })
+                .collect::<Vec<_>>();
+
+            self.draw_image_at(
+                x + glyph.x - total_width / 2.0,
+                y + glyph.y - total_height / 2.0,
+                &Image {
+                    width: glyph.width as i32,
+                    height: glyph.height as i32,
+                    data: &data,
+                },
+                &DrawOptions::default(),
+            );
         }
     }
 }
 
-pub trait DistanceTo<T> {
-    fn distance_to(&self, other: (T, T)) -> T;
-}
-
-impl DistanceTo<f64> for (f64, f64) {
-    fn distance_to(&self, other: (f64, f64)) -> f64 {
-        ((other.0 - self.0) * (other.0 - self.0) + (other.1 - self.1) * (other.1 - self.1)).sqrt()
+impl ToLocal<Extents> for Extents {
+    fn to_local(&self, rect: &Rect) -> Extents {
+        Self {
+            start_x: self.start_x - rect.x,
+            start_y: self.start_y - rect.y,
+            end_x: self.end_x - rect.x,
+            end_y: self.end_y - rect.y,
+        }
     }
 }
 
-impl DistanceTo<f64> for (i32, i32) {
-    fn distance_to(&self, other: (f64, f64)) -> f64 {
-        ((other.0 - self.0 as f64) * (other.0 - self.0 as f64)
-            + (other.1 - self.1 as f64) * (other.1 - self.1 as f64))
-            .sqrt()
+impl DistanceTo<i32> for (i32, i32) {
+    fn distance_to(&self, other: &(i32, i32)) -> i32 {
+        let x = (other.0 - self.0) as f64;
+        let y = (other.1 - self.1) as f64;
+        f64::sqrt(x * x + y * y) as i32
+    }
+}
+
+impl ToGlobal<(i32, i32)> for (f64, f64) {
+    fn to_global(&self, rect: &Rect) -> (i32, i32) {
+        (self.0 as i32 + rect.x, self.1 as i32 + rect.y)
     }
 }

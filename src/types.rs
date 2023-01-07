@@ -1,23 +1,14 @@
-use std::{collections::HashMap, env, fs};
+use std::{env, fs};
 
+use raqote::SolidSource;
 use serde::Deserialize;
+use smithay_client_toolkit::{
+    reexports::client::protocol::wl_surface,
+    shell::layer::LayerSurface,
+    shm::slot::{Buffer, SlotPool},
+};
 
-/// Main struct for the data
-#[derive(Debug)]
-pub struct RuntimeData {
-    pub selection: Selection,
-    pub args: Args,
-    pub config: Config,
-    pub area_rect: Option<Rect>,
-    pub windows: HashMap<gtk::ApplicationWindow, WindowInfo>,
-}
-
-/// The different selection types
-#[derive(Debug)]
-pub enum Selection {
-    Rectangle(Option<RectangleSelection>),
-    Display(Option<DisplaySelection>),
-}
+use crate::runtime_data::RuntimeData;
 
 /// The configuration for colors and other things like that
 #[derive(Debug, Deserialize)]
@@ -47,22 +38,22 @@ impl Default for Config {
             line_width: 1,
             display_highlight_width: 5,
             selection_color: Color {
-                r: 1.0,
-                g: 1.0,
-                b: 1.0,
-                a: 1.0,
+                r: 255,
+                g: 255,
+                b: 255,
+                a: 255,
             },
             shade_color: Color {
-                r: 0.0,
-                g: 0.0,
-                b: 0.0,
-                a: 0.5,
+                r: 0,
+                g: 0,
+                b: 0,
+                a: 127,
             },
             text_color: Color {
-                r: 0.75,
-                g: 0.75,
-                b: 0.75,
-                a: 1.0,
+                r: 190,
+                g: 190,
+                b: 190,
+                a: 255,
             },
             size_text_size: 15,
             mode_text_size: 30,
@@ -71,72 +62,66 @@ impl Default for Config {
     }
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Copy, Clone)]
 pub struct Color {
-    pub r: f64,
-    pub g: f64,
-    pub b: f64,
-    pub a: f64,
+    pub r: u8,
+    pub g: u8,
+    pub b: u8,
+    pub a: u8,
 }
 
-#[derive(Debug, Default)]
-pub struct Args {
-    pub stdout: bool,
-    pub path: Option<String>,
-    pub grim: Option<String>,
-}
-
-#[derive(Debug)]
-pub struct DisplaySelection {
-    pub window: gtk::ApplicationWindow,
-}
-
-impl DisplaySelection {
-    pub fn new(window: gtk::ApplicationWindow) -> Self {
-        Self { window }
-    }
-}
-
-#[derive(Debug)]
-pub struct RectangleSelection {
-    pub extents: Extents,
-    pub modifier: Option<SelectionModifier>,
-    pub active: bool,
-}
-
-impl RectangleSelection {
-    pub fn new(x: i32, y: i32) -> Self {
+impl From<Color> for SolidSource {
+    fn from(color: Color) -> Self {
         Self {
-            extents: Extents {
-                start_x: x,
-                start_y: y,
-                end_x: x,
-                end_y: y,
-            },
-            modifier: None,
-            active: true,
+            r: color.r,
+            g: color.g,
+            b: color.b,
+            a: color.a,
         }
     }
 }
 
-#[derive(Debug, Copy, Clone)]
-pub enum SelectionModifier {
-    Left,
-    Right,
-    Top,
-    Bottom,
-    TopRight,
-    BottomRight,
-    BottomLeft,
-    TopLeft,
-    // Offset from top left corner and original extents
-    Center(i32, i32, Extents),
+/// Represents the layer and the monitor it resides on
+pub struct Monitor {
+    pub layer: LayerSurface,
+    pub image: Vec<u32>,
+    pub pool: SlotPool,
+    pub buffer: Option<Buffer>,
+    pub rect: Rect,
+    pub draw: bool,
 }
 
-#[derive(Debug)]
-pub struct WindowInfo {
-    pub selection_overlay: gtk::DrawingArea,
-    pub monitor: gdk::Monitor,
+impl Monitor {
+    pub fn new(layer: LayerSurface, rect: Rect, runtime_data: &RuntimeData) -> Self {
+        Self {
+            layer,
+            image: runtime_data
+                .image
+                .crop_imm(
+                    (rect.x - runtime_data.area.x) as u32,
+                    (rect.y - runtime_data.area.y) as u32,
+                    rect.width as u32,
+                    rect.height as u32,
+                )
+                .to_rgba8()
+                .chunks_exact(4)
+                .map(|chunks| {
+                    SolidSource::from_unpremultiplied_argb(
+                        chunks[3], chunks[0], chunks[1], chunks[2],
+                    )
+                    .to_u32()
+                })
+                .collect(),
+            buffer: None,
+            rect,
+            pool: SlotPool::new(
+                rect.width as usize * rect.height as usize * 4,
+                &runtime_data.shm_state,
+            )
+            .expect("Failed to create pool!"),
+            draw: true,
+        }
+    }
 }
 
 #[derive(Debug, Copy, Clone)]
@@ -148,7 +133,7 @@ pub struct Extents {
 }
 
 impl Extents {
-    pub fn to_rect(&self) -> Rect {
+    pub fn to_rect(self) -> Rect {
         let (x, width) = if self.start_x < self.end_x {
             (self.start_x, self.end_x - self.start_x)
         } else {
@@ -168,7 +153,7 @@ impl Extents {
         }
     }
 
-    pub fn to_rect_clamped(&self, area: &Rect) -> Rect {
+    pub fn to_rect_clamped(self, area: &Rect) -> Rect {
         let mut rect = self.to_rect();
 
         rect.x = rect.x.clamp(area.x, area.x + area.width - rect.width);
@@ -196,7 +181,7 @@ impl Rect {
             && ((self.y + self.height).min(other.y + other.height) - self.y.max(other.y)) > 0
     }
 
-    pub fn to_extents(&self) -> Extents {
+    pub fn to_extents(self) -> Extents {
         Extents {
             start_x: self.x,
             start_y: self.y,
@@ -218,15 +203,77 @@ impl Rect {
             height,
         };
     }
-}
 
-impl From<gtk::Rectangle> for Rect {
-    fn from(rect: gtk::Rectangle) -> Self {
+    pub fn padded(self, amount: i32) -> Self {
         Self {
-            x: rect.x(),
-            y: rect.y(),
-            width: rect.width(),
-            height: rect.height(),
+            x: self.x - amount,
+            y: self.y - amount,
+            width: self.width + amount,
+            height: self.height + amount,
         }
     }
+}
+
+#[derive(Debug, Copy, Clone)]
+pub enum SelectionModifier {
+    Left,
+    Right,
+    Top,
+    Bottom,
+    TopRight,
+    BottomRight,
+    BottomLeft,
+    TopLeft,
+    // Offset from top left corner and original extents
+    Center(i32, i32, Extents),
+}
+
+pub enum Selection {
+    Rectangle(Option<RectangleSelection>),
+    Display(Option<DisplaySelection>),
+}
+
+pub struct RectangleSelection {
+    pub extents: Extents,
+    pub modifier: Option<SelectionModifier>,
+    pub active: bool,
+}
+
+pub struct DisplaySelection {
+    pub surface: wl_surface::WlSurface,
+}
+
+impl DisplaySelection {
+    pub fn new(surface: wl_surface::WlSurface) -> Self {
+        Self { surface }
+    }
+}
+
+impl RectangleSelection {
+    pub fn new(x: i32, y: i32) -> Self {
+        Self {
+            extents: Extents {
+                start_x: x,
+                start_y: y,
+                end_x: x,
+                end_y: y,
+            },
+            modifier: None,
+            active: true,
+        }
+    }
+}
+
+pub enum MonitorIdentification {
+    Layer(LayerSurface),
+    Surface(wl_surface::WlSurface),
+}
+
+pub enum ExitState {
+    /// Not going to exit
+    None,
+    /// Only exit
+    ExitOnly,
+    /// Exit and perform actions on the selection
+    ExitWithSelection(Rect),
 }

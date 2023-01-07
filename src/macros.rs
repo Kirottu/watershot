@@ -7,43 +7,43 @@ macro_rules! handles {
             (
                 $extents.start_x,
                 $extents.start_y,
-                SelectionModifier::TopLeft,
+                $crate::types::SelectionModifier::TopLeft,
             ),
             (
                 $extents.end_x,
                 $extents.start_y,
-                SelectionModifier::TopRight,
+                $crate::types::SelectionModifier::TopRight,
             ),
             (
                 $extents.end_x,
                 $extents.end_y,
-                SelectionModifier::BottomRight,
+                $crate::types::SelectionModifier::BottomRight,
             ),
             (
                 $extents.start_x,
                 $extents.end_y,
-                SelectionModifier::BottomLeft,
+                $crate::types::SelectionModifier::BottomLeft,
             ),
             // Edges
             (
                 $extents.start_x + ($extents.end_x - $extents.start_x) / 2,
                 $extents.start_y,
-                SelectionModifier::Top,
+                $crate::types::SelectionModifier::Top,
             ),
             (
                 $extents.end_x,
                 $extents.start_y + ($extents.end_y - $extents.start_y) / 2,
-                SelectionModifier::Right,
+                $crate::types::SelectionModifier::Right,
             ),
             (
                 $extents.start_x + ($extents.end_x - $extents.start_x) / 2,
                 $extents.end_y,
-                SelectionModifier::Bottom,
+                $crate::types::SelectionModifier::Bottom,
             ),
             (
                 $extents.start_x,
                 $extents.start_y + ($extents.end_y - $extents.start_y) / 2,
-                SelectionModifier::Left,
+                $crate::types::SelectionModifier::Left,
             ),
         ]
     };
