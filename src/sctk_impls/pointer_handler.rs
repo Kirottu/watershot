@@ -40,6 +40,8 @@ impl PointerHandler for RuntimeData {
                 Motion { .. } => {
                     if let Selection::Rectangle(Some(selection)) = &mut self.selection {
                         if selection.active {
+                            let old = selection.extents;
+
                             match selection.modifier {
                                 // Handle selection modifiers, AKA the drag handles and moving it from the center
                                 Some(modifier) => match modifier {
@@ -86,14 +88,17 @@ impl PointerHandler for RuntimeData {
                                     selection.extents.end_y = global_pos.1;
                                 }
                             }
+
+                            let damage = old.to_rect().xor(&selection.extents.to_rect());
+
                             for monitor in &mut self.monitors {
                                 // Extra padding is added to make sure no artifacts remain on displays
-                                if monitor
-                                    .rect
-                                    .intersects(&selection.extents.to_rect().padded(20))
-                                {
-                                    monitor.draw = true;
-                                }
+                                //monitor.damage.append(&mut damage.clone());
+                                monitor.damage.extend(
+                                    damage
+                                        .iter()
+                                        .filter_map(|rect| rect.constrain(&monitor.rect)),
+                                );
                             }
                         }
                     }
@@ -102,7 +107,7 @@ impl PointerHandler for RuntimeData {
                     println!("Press {:x} @ {:?}", button, event.position);
                     // Redraw all the monitor layers
                     for monitor in &mut self.monitors {
-                        monitor.draw = true;
+                        monitor.damage.push(monitor.rect);
                     }
 
                     match &mut self.selection {

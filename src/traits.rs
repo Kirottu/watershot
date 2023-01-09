@@ -22,6 +22,25 @@ pub trait DrawText {
     fn draw_text(&mut self, x: f32, y: f32, font: &[Font], text: &str, size: f32, color: Color);
 }
 
+pub trait Crop {
+    fn crop(&self, rect: &Rect) -> Vec<u32>;
+}
+
+impl<'a> Crop for Image<'a> {
+    fn crop(&self, rect: &Rect) -> Vec<u32> {
+        assert!(rect.x + rect.width <= self.width && rect.y + rect.height <= self.height);
+        assert!(rect.x + rect.width >= 0 && rect.y + rect.height >= 0);
+        self.data
+            .chunks_exact(self.width as usize)
+            .skip(rect.y as usize)
+            .enumerate()
+            .take_while(|(i, _)| *i < (rect.y + rect.height) as usize)
+            .flat_map(|(_, data)| &data[rect.x as usize..(rect.x + rect.width) as usize])
+            .copied()
+            .collect::<Vec<u32>>()
+    }
+}
+
 impl DrawText for DrawTarget<&mut [u32]> {
     fn draw_text(&mut self, x: f32, y: f32, font: &[Font], text: &str, size: f32, color: Color) {
         let mut layout = Layout::new(CoordinateSystem::PositiveYDown);
@@ -70,6 +89,12 @@ impl ToLocal<Extents> for Extents {
             end_x: self.end_x - rect.x,
             end_y: self.end_y - rect.y,
         }
+    }
+}
+
+impl ToLocal<Rect> for Rect {
+    fn to_local(&self, rect: &Rect) -> Rect {
+        Rect::new(self.x - rect.x, self.y - rect.y, self.width, self.height)
     }
 }
 

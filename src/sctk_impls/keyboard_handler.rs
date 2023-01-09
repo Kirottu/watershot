@@ -51,7 +51,7 @@ impl KeyboardHandler for RuntimeData {
             // Switch selection mode
             keysyms::XKB_KEY_Tab => {
                 for monitor in &mut self.monitors {
-                    monitor.draw = true;
+                    monitor.damage.push(monitor.rect);
                 }
 
                 match &self.selection {

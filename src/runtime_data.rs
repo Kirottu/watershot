@@ -20,7 +20,7 @@ use smithay_client_toolkit::{
 
 use crate::{
     handles,
-    traits::{DrawText, ToLocal},
+    traits::{Crop, DrawText, ToLocal},
     types::{ExitState, MonitorIdentification},
     Config, Monitor, Rect, Selection,
 };
@@ -150,78 +150,68 @@ impl RuntimeData {
             )
         };
 
+        let mut target = DrawTarget::from_backing(monitor.rect.width, monitor.rect.height, slice);
+
+        println!(
+            "{} {}",
+            monitor.damage.len(),
+            monitor
+                .damage
+                .iter()
+                .map(|rect| rect.width * rect.height)
+                .sum::<i32>()
+        );
+
         // Only draw if a redraw has been requested
-        if monitor.draw {
-            monitor.draw = false;
-
-            let mut target =
-                DrawTarget::from_backing(monitor.rect.width, monitor.rect.height, slice);
-
-            target.clear(SolidSource::from_unpremultiplied_argb(0, 0, 0, 0));
-
-            let image = Image {
+        for rect in &monitor.damage {
+            let full_image = Image {
                 width: monitor.rect.width,
                 height: monitor.rect.height,
                 data: &monitor.image,
             };
 
-            target.draw_image_at(0.0, 0.0, &image, &DrawOptions::default());
+            let rect = rect.to_local(&monitor.rect);
+
+            let data = full_image.crop(&rect);
+            let image = Image {
+                width: rect.width,
+                height: rect.height,
+                data: &data,
+            };
+
+            target.draw_image_at(
+                rect.x as f32,
+                rect.y as f32,
+                &image,
+                &DrawOptions::default(),
+            );
 
             match &self.selection {
                 Selection::Rectangle(Some(selection)) => {
                     let mut pb = PathBuilder::new();
                     let ext = &selection.extents.to_local(&monitor.rect);
-                    let rect = ext.to_rect();
+                    let selection_rect = ext.to_rect();
 
-                    // Draw the shaded area around the selection
-                    let source = Source::Solid(self.config.shade_color.into());
-                    let opts = DrawOptions::default();
-                    // #
-                    // #[]
-                    // #
-                    target.fill_rect(
-                        0.0,
-                        0.0,
-                        rect.x as f32,
-                        monitor.rect.height as f32,
-                        &source,
-                        &opts,
-                    );
-                    //   #
-                    // []#
-                    //   #
-                    target.fill_rect(
-                        (rect.x + rect.width) as f32,
-                        0.0,
-                        (monitor.rect.width - rect.x - rect.width) as f32,
-                        monitor.rect.height as f32,
-                        &source,
-                        &opts,
-                    );
+                    let shade_rects = monitor
+                        .rect
+                        .to_local(&monitor.rect)
+                        .substract(&selection_rect)
+                        .iter()
+                        .filter_map(|shade| shade.constrain(&rect))
+                        .collect::<Vec<_>>();
 
-                    //
-                    // []
-                    // ##
-                    target.fill_rect(
-                        rect.x as f32,
-                        0.0,
-                        rect.width as f32,
-                        rect.y as f32,
-                        &source,
-                        &opts,
-                    );
-                    // ##
-                    // []
-                    //
-                    target.fill_rect(
-                        rect.x as f32,
-                        (rect.y + rect.height) as f32,
-                        rect.width as f32,
-                        (monitor.rect.height - rect.y - rect.height) as f32,
-                        &source,
-                        &opts,
-                    );
-
+                    // Draw the shaded rects
+                    for rect in shade_rects {
+                        target.fill_rect(
+                            rect.x as f32,
+                            rect.y as f32,
+                            rect.width as f32,
+                            rect.height as f32,
+                            &Source::Solid(self.config.shade_color.into()),
+                            &DrawOptions::default(),
+                        );
+                    }
+                    /*
                     pb.move_to(ext.start_x as f32, ext.start_y as f32);
                     pb.line_to(ext.end_x as f32, ext.start_y as f32);
                     pb.line_to(ext.end_x as f32, ext.end_y as f32);
@@ -253,7 +243,7 @@ impl RuntimeData {
                             &Source::Solid(self.config.selection_color.into()),
                             &DrawOptions::default(),
                         );
-                    }
+                    }*/
                 }
                 Selection::Display(Some(selection)) => {
                     if selection.surface == *monitor.layer.wl_surface() {
@@ -313,8 +303,11 @@ impl RuntimeData {
             monitor
                 .layer
                 .wl_surface()
-                .damage_buffer(0, 0, monitor.rect.width, monitor.rect.height);
+                .damage_buffer(rect.x, rect.y, rect.width, rect.height);
         }
+
+        monitor.damage.clear();
+
         monitor
             .layer
             .wl_surface()

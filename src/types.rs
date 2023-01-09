@@ -1,4 +1,4 @@
-use std::{env, fs};
+use std::{cmp::Ordering, env, fs};
 
 use raqote::SolidSource;
 use serde::Deserialize;
@@ -88,7 +88,7 @@ pub struct Monitor {
     pub pool: SlotPool,
     pub buffer: Option<Buffer>,
     pub rect: Rect,
-    pub draw: bool,
+    pub damage: Vec<Rect>,
 }
 
 impl Monitor {
@@ -119,7 +119,7 @@ impl Monitor {
                 &runtime_data.shm_state,
             )
             .expect("Failed to create pool!"),
-            draw: true,
+            damage: vec![rect],
         }
     }
 }
@@ -163,7 +163,7 @@ impl Extents {
     }
 }
 
-#[derive(Debug, Default, Clone, Copy)]
+#[derive(Debug, Default, Clone, Copy, Eq, PartialEq)]
 pub struct Rect {
     pub x: i32,
     pub y: i32,
@@ -172,13 +172,31 @@ pub struct Rect {
 }
 
 impl Rect {
+    pub fn new(x: i32, y: i32, width: i32, height: i32) -> Self {
+        Self {
+            x,
+            y,
+            width,
+            height,
+        }
+    }
+
     pub fn contains(&self, x: i32, y: i32) -> bool {
-        x > self.x && x < self.x + self.width && y > self.y && y < self.y + self.height
+        x >= self.x && x <= self.x + self.width && y >= self.y && y <= self.y + self.height
     }
 
     pub fn intersects(&self, other: &Self) -> bool {
         ((self.x + self.width).min(other.x + other.width) - self.x.max(other.x)) > 0
             && ((self.y + self.height).min(other.y + other.height) - self.y.max(other.y)) > 0
+    }
+
+    pub fn intersecting_rect(&self, other: &Self) -> Self {
+        let x = self.x.max(other.x);
+        let y = self.y.max(other.y);
+        let width = (self.x + self.width).min(other.x + other.width) - x;
+        let height = (self.y + self.height).min(other.y + other.height) - y;
+
+        Self::new(x, y, width, height)
     }
 
     pub fn to_extents(self) -> Extents {
@@ -196,12 +214,7 @@ impl Rect {
         let width = (self.x - x + self.width).max(other.x - x + other.width);
         let height = (self.y - y + self.height).max(other.y - y + other.height);
 
-        *self = Rect {
-            x,
-            y,
-            width,
-            height,
-        };
+        *self = Self::new(x, y, width, height);
     }
 
     pub fn padded(self, amount: i32) -> Self {
@@ -210,6 +223,84 @@ impl Rect {
             y: self.y - amount,
             width: self.width + amount,
             height: self.height + amount,
+        }
+    }
+
+    /// Return the split up rectangle, with the area provided missing
+    pub fn substract(&self, subtract: &Self) -> Vec<Self> {
+        let mut result = Vec::new();
+
+        // Add the part of the Rect above the intersection
+        if self.y < subtract.y {
+            result.push(Rect {
+                x: self.x,
+                y: self.y,
+                width: self.width,
+                height: subtract.y - self.y,
+            });
+        }
+
+        // Add the part of the Rect below the subtraction
+        if self.y + self.height > subtract.y + subtract.height {
+            result.push(Rect {
+                x: self.x,
+                y: subtract.y + subtract.height,
+                width: self.width,
+                height: (self.y + self.height) - (subtract.y + subtract.height),
+            });
+        }
+
+        // Add the part of the Rect to the left of the subtraction
+        if self.x < subtract.x {
+            result.push(Rect {
+                x: self.x,
+                y: self.y,
+                width: subtract.x - self.x,
+                height: self.height,
+            });
+        }
+
+        // Add the part of the Rect to the right of the subtraction
+        if self.x + self.width > subtract.x + subtract.width {
+            result.push(Rect {
+                x: subtract.x + subtract.width,
+                y: self.y,
+                width: (self.x + self.width) - (subtract.x + subtract.width),
+                height: self.height,
+            });
+        }
+
+        result
+    }
+
+    pub fn xor(&self, other: &Self) -> Vec<Self> {
+        // If there is no intersection, the damaged area is both rects
+        if !self.intersects(other) {
+            return vec![*self, *other];
+        }
+
+        let intersection = self.intersecting_rect(other);
+
+        let mut results = Vec::new();
+        results.append(&mut self.substract(&intersection));
+        results.append(&mut other.substract(&intersection));
+        results
+    }
+
+    /// Constrain the rectangle to fit inside the provided rectangle
+    pub fn constrain(&self, area: &Self) -> Option<Self> {
+        if !self.intersects(area) {
+            None
+        } else {
+            let mut res = *self;
+
+            res.x = res.x.max(area.x);
+            res.y = res.y.max(area.y);
+
+            res.width = (res.width + res.x).clamp(0, area.width + area.x) - res.x;
+            res.height = (res.height + res.y).clamp(0, area.height + area.y) - res.y;
+
+            Some(res)
         }
     }
 }
@@ -276,4 +367,37 @@ pub enum ExitState {
     ExitOnly,
     /// Exit and perform actions on the selection
     ExitWithSelection(Rect),
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_intersection_rect() {
+        assert_eq!(
+            Rect::intersecting_rect(&Rect::new(0, 0, 10, 10), &Rect::new(5, 5, 10, 10),),
+            Rect::new(5, 5, 5, 5),
+        );
+        assert_eq!(
+            Rect::intersecting_rect(&Rect::new(0, 0, 10, 10), &Rect::new(-5, -5, 10, 10),),
+            Rect::new(0, 0, 5, 5),
+        );
+    }
+
+    #[test]
+    fn test_xor() {
+        let damage = Rect::new(0, 0, 10, 10).xor(&Rect::new(0, 0, 8, 8));
+
+        for x in 0..15 {
+            for y in 0..15 {
+                if damage.iter().any(|rect| rect.contains(x, y)) {
+                    print!("#");
+                } else {
+                    print!(".");
+                }
+            }
+            println!();
+        }
+    }
 }
