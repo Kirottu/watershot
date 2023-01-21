@@ -1,4 +1,4 @@
-use std::{cmp::Ordering, env, fs};
+use std::{cmp::Ordering, collections::HashSet, env, fs};
 
 use raqote::SolidSource;
 use serde::Deserialize;
@@ -218,16 +218,23 @@ impl Rect {
     }
 
     pub fn padded(self, amount: i32) -> Self {
-        Self {
-            x: self.x - amount,
-            y: self.y - amount,
-            width: self.width + amount,
-            height: self.height + amount,
+        let mut width = self.width + 2 * amount;
+        let mut height = self.height + 2 * amount;
+
+        // Make sure we have no negative size
+        if width < 0 {
+            width = 0;
         }
+
+        if height < 0 {
+            height = 0;
+        }
+
+        Self::new(self.x - amount, self.y - amount, width, height)
     }
 
     /// Return the split up rectangle, with the area provided missing
-    pub fn substract(&self, subtract: &Self) -> Vec<Self> {
+    pub fn subtract(&self, subtract: &Self) -> Vec<Self> {
         let mut result = Vec::new();
 
         // Add the part of the Rect above the intersection
@@ -254,9 +261,9 @@ impl Rect {
         if self.x < subtract.x {
             result.push(Rect {
                 x: self.x,
-                y: self.y,
+                y: subtract.y,
                 width: subtract.x - self.x,
-                height: self.height,
+                height: subtract.height,
             });
         }
 
@@ -264,9 +271,9 @@ impl Rect {
         if self.x + self.width > subtract.x + subtract.width {
             result.push(Rect {
                 x: subtract.x + subtract.width,
-                y: self.y,
+                y: subtract.y,
                 width: (self.x + self.width) - (subtract.x + subtract.width),
-                height: self.height,
+                height: subtract.height,
             });
         }
 
@@ -282,8 +289,8 @@ impl Rect {
         let intersection = self.intersecting_rect(other);
 
         let mut results = Vec::new();
-        results.append(&mut self.substract(&intersection));
-        results.append(&mut other.substract(&intersection));
+        results.append(&mut self.subtract(&intersection));
+        results.append(&mut other.subtract(&intersection));
         results
     }
 

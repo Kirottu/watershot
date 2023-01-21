@@ -152,25 +152,27 @@ impl RuntimeData {
 
         let mut target = DrawTarget::from_backing(monitor.rect.width, monitor.rect.height, slice);
 
-        println!(
-            "{} {}",
-            monitor.damage.len(),
-            monitor
+        // Only draw if there is damage
+        if !monitor.damage.is_empty() {
+            let rect = monitor
                 .damage
-                .iter()
-                .map(|rect| rect.width * rect.height)
-                .sum::<i32>()
-        );
+                .clone()
+                .into_iter()
+                .reduce(|mut accum, rect| {
+                    accum.extend(&rect);
+                    accum
+                })
+                .unwrap()
+                .padded(self.config.handle_radius)
+                .constrain(&monitor.rect)
+                .unwrap()
+                .to_local(&monitor.rect);
 
-        // Only draw if a redraw has been requested
-        for rect in &monitor.damage {
             let full_image = Image {
                 width: monitor.rect.width,
                 height: monitor.rect.height,
                 data: &monitor.image,
             };
-
-            let rect = rect.to_local(&monitor.rect);
 
             let data = full_image.crop(&rect);
             let image = Image {
@@ -192,13 +194,7 @@ impl RuntimeData {
                     let ext = &selection.extents.to_local(&monitor.rect);
                     let selection_rect = ext.to_rect();
 
-                    let shade_rects = monitor
-                        .rect
-                        .to_local(&monitor.rect)
-                        .substract(&selection_rect)
-                        .iter()
-                        .filter_map(|shade| shade.constrain(&rect))
-                        .collect::<Vec<_>>();
+                    let shade_rects = rect.subtract(&selection_rect);
 
                     // Draw the shaded rects
                     for rect in shade_rects {
@@ -211,7 +207,7 @@ impl RuntimeData {
                             &DrawOptions::default(),
                         );
                     }
-                    /*
+
                     pb.move_to(ext.start_x as f32, ext.start_y as f32);
                     pb.line_to(ext.end_x as f32, ext.start_y as f32);
                     pb.line_to(ext.end_x as f32, ext.end_y as f32);
@@ -243,7 +239,7 @@ impl RuntimeData {
                             &Source::Solid(self.config.selection_color.into()),
                             &DrawOptions::default(),
                         );
-                    }*/
+                    }
                 }
                 Selection::Display(Some(selection)) => {
                     if selection.surface == *monitor.layer.wl_surface() {
@@ -299,7 +295,6 @@ impl RuntimeData {
                     );
                 }
             }
-
             monitor
                 .layer
                 .wl_surface()
