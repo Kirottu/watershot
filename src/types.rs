@@ -25,14 +25,10 @@ pub struct Args {
 
 #[derive(Subcommand)]
 pub enum SaveLocation {
-    Path {
-        /// The path to save the image to
-        path: String,
-    },
-    Directory {
-        /// The directory to save the image to with a generated name
-        path: String,
-    },
+    /// The path to save the image to
+    Path { path: String },
+    /// The directory to save the image to with a generated name
+    Directory { path: String },
 }
 
 /// The configuration for colors and other things like that
