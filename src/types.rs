@@ -1,5 +1,6 @@
-use std::{cmp::Ordering, collections::HashSet, env, fs};
+use std::{env, fs};
 
+use clap::{Parser, Subcommand};
 use raqote::SolidSource;
 use serde::Deserialize;
 use smithay_client_toolkit::{
@@ -9,6 +10,30 @@ use smithay_client_toolkit::{
 };
 
 use crate::runtime_data::RuntimeData;
+
+#[derive(Parser)]
+#[command(author, version, about)]
+pub struct Args {
+    /// Copy the screenshot after exit
+    #[arg(short, long)]
+    pub copy: bool,
+
+    /// Save the image into a file
+    #[command(subcommand)]
+    pub save: Option<SaveLocation>,
+}
+
+#[derive(Subcommand)]
+pub enum SaveLocation {
+    Path {
+        /// The path to save the image to
+        path: String,
+    },
+    Directory {
+        /// The directory to save the image to with a generated name
+        path: String,
+    },
+}
 
 /// The configuration for colors and other things like that
 #[derive(Debug, Deserialize)]

@@ -3,7 +3,7 @@ use std::{fs, io::Cursor, process::Command};
 use fontconfig::Fontconfig;
 use fontdue::{Font, FontSettings};
 use image::DynamicImage;
-use raqote::{DrawOptions, DrawTarget, Image, PathBuilder, SolidSource, Source, StrokeStyle};
+use raqote::{DrawOptions, DrawTarget, Image, PathBuilder, Source, StrokeStyle};
 use smithay_client_toolkit::{
     compositor::CompositorState,
     output::OutputState,

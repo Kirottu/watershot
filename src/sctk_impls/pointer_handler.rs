@@ -1,3 +1,4 @@
+use log::info;
 use smithay_client_toolkit::{
     delegate_pointer,
     reexports::client::{protocol::wl_pointer, Connection, QueueHandle},
@@ -8,7 +9,7 @@ use crate::{
     handles,
     runtime_data::RuntimeData,
     traits::{DistanceTo, ToGlobal},
-    types::{DisplaySelection, RectangleSelection, Selection, SelectionModifier},
+    types::{DisplaySelection, Rect, RectangleSelection, Selection, SelectionModifier},
 };
 
 delegate_pointer!(RuntimeData);
@@ -32,10 +33,10 @@ impl PointerHandler for RuntimeData {
 
             match event.kind {
                 Enter { .. } => {
-                    println!("Pointer entered @{:?}", event.position);
+                    info!("Pointer entered @{:?}", event.position);
                 }
                 Leave { .. } => {
-                    println!("Pointer left");
+                    info!("Pointer left");
                 }
                 Motion { .. } => {
                     if let Selection::Rectangle(Some(selection)) = &mut self.selection {
@@ -89,7 +90,15 @@ impl PointerHandler for RuntimeData {
                                 }
                             }
 
-                            let damage = old.to_rect().xor(&selection.extents.to_rect());
+                            let mut damage = old.to_rect().xor(&selection.extents.to_rect());
+                            damage.extend(handles!(&selection.extents).iter().map(|(x, y, _)| {
+                                Rect::new(
+                                    x - self.config.handle_radius,
+                                    y - self.config.handle_radius,
+                                    self.config.handle_radius * 2,
+                                    self.config.handle_radius * 2,
+                                )
+                            }));
 
                             for monitor in &mut self.monitors {
                                 // Extra padding is added to make sure no artifacts remain on displays
@@ -104,7 +113,7 @@ impl PointerHandler for RuntimeData {
                     }
                 }
                 Press { button, .. } => {
-                    println!("Press {:x} @ {:?}", button, event.position);
+                    info!("Press {:x} @ {:?}", button, event.position);
                     // Redraw all the monitor layers
                     for monitor in &mut self.monitors {
                         monitor.damage.push(monitor.rect);
@@ -150,7 +159,7 @@ impl PointerHandler for RuntimeData {
                     }
                 }
                 Release { button, .. } => {
-                    println!("Release {:x} @ {:?}", button, event.position);
+                    info!("Release {:x} @ {:?}", button, event.position);
 
                     if let Selection::Rectangle(Some(selection)) = &mut self.selection {
                         selection.active = false;
@@ -161,7 +170,7 @@ impl PointerHandler for RuntimeData {
                     vertical,
                     ..
                 } => {
-                    println!("Scroll H:{:?}, V:{:?}", horizontal, vertical);
+                    info!("Scroll H:{:?}, V:{:?}", horizontal, vertical);
                 }
             }
         }

@@ -1,3 +1,4 @@
+use log::info;
 use smithay_client_toolkit::{
     delegate_keyboard,
     reexports::client::{
@@ -97,7 +98,7 @@ impl KeyboardHandler for RuntimeData {
         _: u32,
         event: KeyEvent,
     ) {
-        println!("Key release: {:?}", event);
+        info!("Key release: {:?}", event);
     }
 
     fn update_modifiers(
@@ -108,6 +109,6 @@ impl KeyboardHandler for RuntimeData {
         _serial: u32,
         modifiers: Modifiers,
     ) {
-        println!("Update modifiers: {:?}", modifiers);
+        info!("Update modifiers: {:?}", modifiers);
     }
 }

@@ -1,12 +1,15 @@
 use std::io::Cursor;
 
+use chrono::Local;
+use clap::Parser;
 use image::{DynamicImage, ImageFormat};
+use log::{error, info};
 use runtime_data::RuntimeData;
 use smithay_client_toolkit::{
     reexports::client::{globals::registry_queue_init, Connection},
     shell::layer::{Anchor, KeyboardInteractivity, Layer, LayerSurface},
 };
-use types::{Config, ExitState, Monitor, Rect, Selection};
+use types::{Args, Config, ExitState, Monitor, Rect, SaveLocation, Selection};
 use wl_clipboard_rs::copy;
 
 mod macros;
@@ -25,6 +28,9 @@ mod sctk_impls {
 }
 
 fn main() {
+    let args = Args::parse();
+    env_logger::init();
+
     if let Some((image, rect)) = gui() {
         let image = image.crop_imm(
             rect.x as u32,
@@ -33,10 +39,31 @@ fn main() {
             rect.height as u32,
         );
 
+        // Save the file if an argument for that is present
+        if let Some(save_location) = &args.save {
+            match save_location {
+                SaveLocation::Path { path } => {
+                    if let Err(why) = image.save(path) {
+                        error!("Error saving image: {}", why);
+                    }
+                }
+                SaveLocation::Directory { path } => {
+                    let local = Local::now();
+                    if let Err(why) = image.save(
+                        local
+                            .format(&format!("{}/WaterShot_%d-%m-%Y_%H:%M", path))
+                            .to_string(),
+                    ) {
+                        error!("Error saving image: {}", why);
+                    }
+                }
+            }
+        }
+
         // Fork to serve copy requests
         match unsafe { nix::unistd::fork() } {
             Ok(nix::unistd::ForkResult::Parent { .. }) => {
-                println!("Forked to serve copy requests")
+                info!("Forked to serve copy requests")
             }
             Ok(nix::unistd::ForkResult::Child) => {
                 // Save the selected image into the buffer

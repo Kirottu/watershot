@@ -1,5 +1,6 @@
 [package]
 name = "watershot"
+authors = ["Kirottu"]
 version = "0.1.0"
 edition = "2021"
 
@@ -16,3 +17,6 @@ fontdue = "0.7.2"
 wl-clipboard-rs = "0.7.0"
 nix = { version = "0.26.1", default-features = false, features = ["process"] }
 clap = { version = "4.0.32", features = ["derive"] }
+chrono = "0.4.23"
+env_logger = "0.10.0"
+log = "0.4.17"

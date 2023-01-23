@@ -1,3 +1,4 @@
+use log::info;
 use smithay_client_toolkit::{
     delegate_seat,
     reexports::client::{protocol::wl_seat, Connection, QueueHandle},
@@ -23,7 +24,7 @@ impl SeatHandler for RuntimeData {
         capability: Capability,
     ) {
         if capability == Capability::Keyboard && self.keyboard.is_none() {
-            println!("Set keyboard capability");
+            info!("Set keyboard capability");
             let keyboard = self
                 .seat_state
                 .get_keyboard(qh, &seat, None)
@@ -32,7 +33,7 @@ impl SeatHandler for RuntimeData {
         }
 
         if capability == Capability::Pointer && self.pointer.is_none() {
-            println!("Set pointer capability");
+            info!("Set pointer capability");
             let pointer = self
                 .seat_state
                 .get_pointer(qh, &seat)
@@ -50,12 +51,12 @@ impl SeatHandler for RuntimeData {
         capability: Capability,
     ) {
         if capability == Capability::Keyboard && self.keyboard.is_some() {
-            println!("Unset keyboard capability");
+            info!("Unset keyboard capability");
             self.keyboard.take().unwrap().release();
         }
 
         if capability == Capability::Pointer && self.pointer.is_some() {
-            println!("Unset pointer capability");
+            info!("Unset pointer capability");
             self.pointer.take().unwrap().release();
         }
     }
