@@ -31,7 +31,7 @@ fn main() {
     let args = Args::parse();
     env_logger::init();
 
-    if let Some((image, rect)) = gui() {
+    if let Some((image, rect)) = gui(&args) {
         let image = image.crop_imm(
             rect.x as u32,
             rect.y as u32,
@@ -86,12 +86,12 @@ fn main() {
     }
 }
 
-fn gui() -> Option<(DynamicImage, Rect)> {
+fn gui(args: &Args) -> Option<(DynamicImage, Rect)> {
     let conn = Connection::connect_to_env().unwrap();
 
     let (globals, mut event_queue) = registry_queue_init(&conn).unwrap();
     let qh = event_queue.handle();
-    let mut runtime_data = RuntimeData::new(&qh, &globals);
+    let mut runtime_data = RuntimeData::new(&qh, &globals, args);
 
     // Fetch the outputs from the compositor
     event_queue.roundtrip(&mut runtime_data).unwrap();

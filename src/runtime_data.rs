@@ -21,7 +21,7 @@ use smithay_client_toolkit::{
 use crate::{
     handles,
     traits::{Crop, DrawText, ToLocal},
-    types::{ExitState, MonitorIdentification},
+    types::{Args, ExitState, MonitorIdentification},
     Config, Monitor, Rect, Selection,
 };
 
@@ -51,8 +51,8 @@ pub struct RuntimeData {
 }
 
 impl RuntimeData {
-    pub fn new(qh: &QueueHandle<Self>, globals: &GlobalList) -> Self {
-        let output = Command::new("grim")
+    pub fn new(qh: &QueueHandle<Self>, globals: &GlobalList, args: &Args) -> Self {
+        let output = Command::new(args.grim.as_ref().unwrap_or(&"grim".to_string()))
             .arg("-t")
             .arg("ppm")
             .arg("-")

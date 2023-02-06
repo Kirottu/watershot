@@ -18,6 +18,10 @@ pub struct Args {
     #[arg(short, long)]
     pub copy: bool,
 
+    /// Path to the `grim` executable
+    #[arg(short, long)]
+    pub grim: Option<String>,
+
     /// Save the image into a file
     #[command(subcommand)]
     pub save: Option<SaveLocation>,

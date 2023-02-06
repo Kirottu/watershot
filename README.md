@@ -13,11 +13,18 @@ cargo install --path .
 # Usage
 Just run the executable. 
 Do note that without any arguments, the screenshots are not saved/copied anywhere.
-Either `--stdout`/`-s` or `--path`/`-p` have to be present.
 
 ```
--s, --stdout: Output final image to stdout (can be piped to something like `wl-copy`)
--p, --path: Save final image to folder specified
+Commands:
+  path       The path to save the image to
+  directory  The directory to save the image to with a generated name
+  help       Print this message or the help of the given subcommand(s)
+
+Options:
+  -c, --copy     Copy the screenshot after exit
+  -g, --grim <GRIM>  Path to the `grim` executable
+  -h, --help     Print help
+  -V, --version  Print version
 ```
 
 # Configuration
