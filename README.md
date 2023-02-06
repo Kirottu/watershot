@@ -1,4 +1,4 @@
-# WaterShot
+# Watershot
 A simple wayland native screenshot tool inspired by [Flameshot](https://flameshot.org/).
 
 # Installation
@@ -28,7 +28,7 @@ Options:
 ```
 
 # Configuration
-WaterShot supports configuration of colors, fonts, sizes, etc. via it's config file. The config file is
+Watershot supports configuration of colors, fonts, sizes, etc. via it's config file. The config file is
 saved in `~/.config/watershot.ron` and uses the ron config format.
 
 Here is an example config for it:

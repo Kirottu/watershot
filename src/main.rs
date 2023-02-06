@@ -51,7 +51,7 @@ fn main() {
                     let local = Local::now();
                     if let Err(why) = image.save(
                         local
-                            .format(&format!("{}/WaterShot_%d-%m-%Y_%H:%M", path))
+                            .format(&format!("{}/Watershot_%d-%m-%Y_%H:%M", path))
                             .to_string(),
                     ) {
                         error!("Error saving image: {}", why);
