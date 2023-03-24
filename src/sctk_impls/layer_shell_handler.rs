@@ -13,12 +13,19 @@ impl LayerShellHandler for RuntimeData {
 
     fn configure(
         &mut self,
-        _conn: &Connection,
+        conn: &Connection,
         qh: &QueueHandle<Self>,
         layer: &LayerSurface,
         _configure: LayerSurfaceConfigure,
         _serial: u32,
     ) {
+        let _ = self.themed_pointer.as_ref().unwrap().set_cursor(
+            conn,
+            "crosshair",
+            self.shm_state.wl_shm(),
+            &self.pointer_surface,
+        );
+
         self.draw(MonitorIdentification::Layer(layer.clone()), qh);
     }
 }

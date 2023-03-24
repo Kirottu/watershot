@@ -9,11 +9,11 @@ use smithay_client_toolkit::{
     output::OutputState,
     reexports::client::{
         globals::GlobalList,
-        protocol::{wl_keyboard, wl_pointer, wl_shm},
+        protocol::{wl_keyboard, wl_pointer, wl_shm, wl_surface},
         QueueHandle,
     },
     registry::RegistryState,
-    seat::SeatState,
+    seat::{pointer::ThemedPointer, SeatState},
     shell::layer::LayerShell,
     shm::ShmState,
 };
@@ -38,6 +38,9 @@ pub struct RuntimeData {
     // Devices
     pub keyboard: Option<wl_keyboard::WlKeyboard>,
     pub pointer: Option<wl_pointer::WlPointer>,
+
+    pub pointer_surface: wl_surface::WlSurface,
+    pub themed_pointer: Option<ThemedPointer>,
 
     /// Combined area of all monitors
     pub area: Rect,
@@ -78,12 +81,16 @@ impl RuntimeData {
         )
         .expect("Failed to load font");
 
+        let compositor_state =
+            CompositorState::bind(globals, qh).expect("wl_compositor is not available");
+
+        let pointer_surface = compositor_state.create_surface(qh);
+
         RuntimeData {
             registry_state: RegistryState::new(globals),
             seat_state: SeatState::new(globals, qh),
             output_state: OutputState::new(globals, qh),
-            compositor_state: CompositorState::bind(globals, qh)
-                .expect("wl_compositor is not available"),
+            compositor_state,
             layer_state: LayerShell::bind(globals, qh).expect("layer shell is not available"),
             shm_state: ShmState::bind(globals, qh).expect("wl_shm is not available"),
             selection: Selection::Rectangle(None),
@@ -94,7 +101,9 @@ impl RuntimeData {
             font: vec![font],
             keyboard: None,
             pointer: None,
+            themed_pointer: None,
             exit: ExitState::None,
+            pointer_surface,
         }
     }
 
@@ -116,9 +125,9 @@ impl RuntimeData {
             monitor
                 .pool
                 .create_buffer(
-                    monitor.rect.width as i32,
-                    monitor.rect.height as i32,
-                    monitor.rect.width as i32 * 4,
+                    monitor.rect.width,
+                    monitor.rect.height,
+                    monitor.rect.width * 4,
                     wl_shm::Format::Argb8888,
                 )
                 .expect("Failed to create buffer!")
@@ -131,9 +140,9 @@ impl RuntimeData {
                 let (second_buffer, canvas) = monitor
                     .pool
                     .create_buffer(
-                        monitor.rect.width as i32,
-                        monitor.rect.height as i32,
-                        monitor.rect.width as i32 * 4,
+                        monitor.rect.width,
+                        monitor.rect.height,
+                        monitor.rect.width * 4,
                         wl_shm::Format::Argb8888,
                     )
                     .expect("Failed to create buffer!");
