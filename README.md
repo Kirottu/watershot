@@ -2,6 +2,9 @@
 A simple wayland native screenshot tool inspired by [Flameshot](https://flameshot.org/).
 
 # Installation
+On an Arch based distro, you can simply install the AUR package [watershot-git](https://aur.archlinux.org/packages/watershot-git).
+
+## Manual installation
 Simply clone the repository and install the program locally with cargo. You will need to have [grim](https://sr.ht/~emersion/grim/),
 if it is in a non-standard location you can use `--grim` or `-g` argument to set a custom path. A compositor that implements layer-shell is also a requirement.
 ```
