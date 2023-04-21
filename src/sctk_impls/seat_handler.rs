@@ -2,7 +2,7 @@ use log::info;
 use smithay_client_toolkit::{
     delegate_seat,
     reexports::client::{protocol::wl_seat, Connection, QueueHandle},
-    seat::{Capability, SeatHandler, SeatState},
+    seat::{pointer::ThemeSpec, Capability, SeatHandler, SeatState},
 };
 
 use crate::runtime_data::RuntimeData;
@@ -32,14 +32,18 @@ impl SeatHandler for RuntimeData {
             self.keyboard = Some(keyboard);
         }
 
-        if capability == Capability::Pointer && self.pointer.is_none() {
+        if capability == Capability::Pointer
+            && self.pointer.is_none()
+            && self.themed_pointer.is_none()
+        {
             info!("Set pointer capability");
-            let pointer = self
-                .seat_state
-                .get_pointer(qh, &seat)
-                .expect("Failed to create pointer");
 
+            let (pointer, themed_pointer) = self
+                .seat_state
+                .get_pointer_with_theme(qh, &seat, ThemeSpec::default(), 1)
+                .expect("Failed to create themed pointer");
             self.pointer = Some(pointer);
+            self.themed_pointer = Some(themed_pointer);
         }
     }
 
