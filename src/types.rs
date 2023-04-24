@@ -18,6 +18,10 @@ pub struct Args {
     #[arg(short, long)]
     pub copy: bool,
 
+    /// Output the screenshot into stdout in PNG format
+    #[arg(short, long)]
+    pub stdout: bool,
+
     /// Path to the `grim` executable
     #[arg(short, long)]
     pub grim: Option<String>,

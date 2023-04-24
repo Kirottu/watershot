@@ -24,10 +24,11 @@ Commands:
   help       Print this message or the help of the given subcommand(s)
 
 Options:
-  -c, --copy     Copy the screenshot after exit
+  -c, --copy         Copy the screenshot after exit
+  -s, --stdout       Output the screenshot into stdout in PNG format
   -g, --grim <GRIM>  Path to the `grim` executable
-  -h, --help     Print help
-  -V, --version  Print version
+  -h, --help         Print help
+  -V, --version      Print version
 ```
 
 # Configuration

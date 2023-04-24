@@ -1,4 +1,4 @@
-use std::io::Cursor;
+use std::io::{self, Cursor, Write};
 
 use chrono::Local;
 use clap::Parser;
@@ -60,28 +60,38 @@ fn main() {
             }
         }
 
-        // Fork to serve copy requests
-        match unsafe { nix::unistd::fork() } {
-            Ok(nix::unistd::ForkResult::Parent { .. }) => {
-                info!("Forked to serve copy requests")
-            }
-            Ok(nix::unistd::ForkResult::Child) => {
-                // Save the selected image into the buffer
-                let mut buf = Cursor::new(Vec::new());
-                image
-                    .write_to(&mut buf, ImageFormat::Png)
-                    .expect("Failed to write image to buffer as PNG");
+        // Save the selected image into the buffer
+        let mut buf = Cursor::new(Vec::new());
+        image
+            .write_to(&mut buf, ImageFormat::Png)
+            .expect("Failed to write image to buffer as PNG");
 
-                // Serve copy requests
-                let mut opts = copy::Options::new();
-                opts.foreground(true);
-                opts.copy(
-                    copy::Source::Bytes(buf.into_inner().into_boxed_slice()),
-                    copy::MimeType::Autodetect,
-                )
-                .expect("Failed to serve copied image");
+        let buf = buf.into_inner();
+
+        if args.stdout {
+            if let Err(why) = io::stdout().lock().write_all(&buf) {
+                error!("Failed to write image content to stdout: {}", why);
             }
-            Err(why) => println!("Failed to fork: {}", why),
+        }
+
+        // Fork to serve copy requests
+        if args.copy {
+            match unsafe { nix::unistd::fork() } {
+                Ok(nix::unistd::ForkResult::Parent { .. }) => {
+                    info!("Forked to serve copy requests")
+                }
+                Ok(nix::unistd::ForkResult::Child) => {
+                    // Serve copy requests
+                    let mut opts = copy::Options::new();
+                    opts.foreground(true);
+                    opts.copy(
+                        copy::Source::Bytes(buf.into_boxed_slice()),
+                        copy::MimeType::Autodetect,
+                    )
+                    .expect("Failed to serve copied image");
+                }
+                Err(why) => println!("Failed to fork: {}", why),
+            }
         }
     }
 }
