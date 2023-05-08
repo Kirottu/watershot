@@ -31,6 +31,15 @@ Options:
   -V, --version      Print version
 ```
 
+# Dependencies
+
+## Build Time
+Some of the cargo packages rely on system dependencies. For Nix based systems this is handled with flake.nix, but other systems may need to manually install:
+ - fontconfig
+ - pkgconfig
+ - libxkbcommon
+
+
 # Configuration
 Watershot supports configuration of colors, fonts, sizes, etc. via it's config file. The config file is
 saved in `~/.config/watershot.ron` and uses the ron config format.
