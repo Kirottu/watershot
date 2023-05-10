@@ -15,9 +15,12 @@
       cellsFrom = self + "/nix";
       cellBlocks = with std.blockTypes; [
         (installables "packages")
+        (devshells "devshells")
+        (nixago "configs")
       ];
     }
       {
         packages = std.harvest self ["watershot" "packages"];
+        devShells = std.harvest self ["repo" "devshells"];
       };
 }
