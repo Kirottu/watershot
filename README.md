@@ -39,9 +39,9 @@ not saved/copied anywhere.
 
 ```
 Commands:
-  path The path to save the image to
-  directory The directory to save the image to with a generated name
-  help Print this message or the help of the given subcommand(s)
+  path       The path to save the image to
+  directory  The directory to save the image to with a generated name
+  help       Print this message or the help of the given subcommand(s)
 
 Options:
   -c, --copy         Copy the screenshot after exit
