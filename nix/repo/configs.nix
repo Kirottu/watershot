@@ -32,5 +32,8 @@ in {
       nodePackages.prettier-plugin-toml
       rustfmt
     ];
+    devshell.startup.prettier-plugin-toml = nixpkgs.lib.stringsWithDeps.noDepEntry ''
+      export NODE_PATH=${nixpkgs.nodePackages.prettier-plugin-toml}/lib/node_modules:$NODE_PATH
+    '';
   };
 }
