@@ -9,7 +9,11 @@
     };
   };
 
-  outputs = { self, std, ...} @ inputs:
+  outputs = {
+    self,
+    std,
+    ...
+  } @ inputs:
     std.growOn {
       inherit inputs;
       cellsFrom = self + "/nix";
@@ -19,8 +23,8 @@
         (nixago "configs")
       ];
     }
-      {
-        packages = std.harvest self ["watershot" "packages"];
-        devShells = std.harvest self ["repo" "devshells"];
-      };
+    {
+      packages = std.harvest self ["watershot" "packages"];
+      devShells = std.harvest self ["repo" "devshells"];
+    };
 }
