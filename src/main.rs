@@ -7,7 +7,10 @@ use log::{error, info};
 use runtime_data::RuntimeData;
 use smithay_client_toolkit::{
     reexports::client::{globals::registry_queue_init, Connection},
-    shell::layer::{Anchor, KeyboardInteractivity, Layer, LayerSurface},
+    shell::{
+        wlr_layer::{Anchor, KeyboardInteractivity, Layer},
+        WaylandSurface,
+    },
 };
 use types::{Args, Config, ExitState, Monitor, Rect, SaveLocation, Selection};
 use wl_clipboard_rs::copy;
@@ -127,18 +130,23 @@ fn gui(args: &Args) -> Option<(DynamicImage, Rect)> {
         // Extend the area spanning all monitors with the current monitor
         runtime_data.area.extend(&rect);
 
-        let layer = LayerSurface::builder()
-            .size(size)
-            .anchor(Anchor::TOP)
-            .output(&output)
-            .exclusive_zone(-1) // Ignore any other exclusive zone
-            .keyboard_interactivity(KeyboardInteractivity::Exclusive)
-            .map(&qh, &runtime_data.layer_state, surface, Layer::Overlay)
-            .expect("Failed to create layer surface");
+        let layer = runtime_data.layer_state.create_layer_surface(
+            &qh,
+            surface.clone(),
+            Layer::Overlay,
+            Some("watershot"),
+            Some(&output),
+        );
+
+        layer.set_anchor(Anchor::TOP | Anchor::BOTTOM | Anchor::LEFT | Anchor::RIGHT);
+        layer.set_exclusive_zone(-1);
+        layer.set_keyboard_interactivity(KeyboardInteractivity::Exclusive);
+
+        layer.commit();
 
         runtime_data
             .monitors
-            .push(Monitor::new(layer, rect, &runtime_data));
+            .push(Monitor::new(layer, surface, rect, &runtime_data));
     }
 
     event_queue.roundtrip(&mut runtime_data).unwrap();

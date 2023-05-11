@@ -1158,8 +1158,9 @@ checksum = "a507befe795404456341dfab10cef66ead4c041f62b8b11bbb92bffe5d0953e0"
 
 [[package]]
 name = "smithay-client-toolkit"
-version = "0.16.0"
-source = "git+https://github.com/smithay/client-toolkit?rev=327f9cd791d8810fe7324ee1ddd48adaf3592ca4#327f9cd791d8810fe7324ee1ddd48adaf3592ca4"
+version = "0.17.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e1476c3d89bb67079264b88aaf4f14358353318397e083b7c4e8c14517f55de7"
 dependencies = [
  "bitflags",
  "calloop",
@@ -1171,7 +1172,7 @@ dependencies = [
  "pkg-config",
  "thiserror",
  "wayland-backend",
- "wayland-client 0.30.0",
+ "wayland-client 0.30.1",
  "wayland-cursor",
  "wayland-protocols 0.30.0",
  "wayland-protocols-wlr",
@@ -1458,11 +1459,12 @@ dependencies = [
 
 [[package]]
 name = "wayland-client"
-version = "0.30.0"
+version = "0.30.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1a925bd68c8b652af4e6f11a32410bd31bf84061c5ef279ed081520c60f203b4"
+checksum = "85bde68449abab1a808e5227b6e295f4ae3680911eb7711b4a2cb90141edb780"
 dependencies = [
  "bitflags",
+ "calloop",
  "nix 0.26.1",
  "wayland-backend",
  "wayland-scanner 0.30.0",
@@ -1487,7 +1489,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "2d0c3a0d5b4b688b07b0442362d3ed6bf04724fcc16cd69ab6285b90dbc487aa"
 dependencies = [
  "nix 0.26.1",
- "wayland-client 0.30.0",
+ "wayland-client 0.30.1",
  "xcursor",
 ]
 
@@ -1511,7 +1513,7 @@ checksum = "7fefbeb8a360abe67ab7c2efe1d297a1a50ee011f5460791bc18870c26bb84e2"
 dependencies = [
  "bitflags",
  "wayland-backend",
- "wayland-client 0.30.0",
+ "wayland-client 0.30.1",
  "wayland-scanner 0.30.0",
 ]
 
@@ -1523,7 +1525,7 @@ checksum = "fce991093320e4a6a525876e6b629ab24da25f9baef0c2e0080ad173ec89588a"
 dependencies = [
  "bitflags",
  "wayland-backend",
- "wayland-client 0.30.0",
+ "wayland-client 0.30.1",
  "wayland-protocols 0.30.0",
  "wayland-scanner 0.30.0",
 ]

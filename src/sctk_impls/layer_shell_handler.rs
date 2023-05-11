@@ -1,7 +1,7 @@
 use smithay_client_toolkit::{
     delegate_layer,
     reexports::client::{Connection, QueueHandle},
-    shell::layer::{LayerShellHandler, LayerSurface, LayerSurfaceConfigure},
+    shell::wlr_layer::{LayerShellHandler, LayerSurface, LayerSurfaceConfigure},
 };
 
 use crate::{runtime_data::RuntimeData, types::MonitorIdentification};
@@ -24,6 +24,7 @@ impl LayerShellHandler for RuntimeData {
             "crosshair",
             self.shm_state.wl_shm(),
             &self.pointer_surface,
+            1,
         );
 
         self.draw(MonitorIdentification::Layer(layer.clone()), qh);

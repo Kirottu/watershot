@@ -5,7 +5,7 @@ use raqote::SolidSource;
 use serde::Deserialize;
 use smithay_client_toolkit::{
     reexports::client::protocol::wl_surface,
-    shell::layer::LayerSurface,
+    shell::wlr_layer::LayerSurface,
     shm::slot::{Buffer, SlotPool},
 };
 
@@ -113,6 +113,7 @@ impl From<Color> for SolidSource {
 /// Represents the layer and the monitor it resides on
 pub struct Monitor {
     pub layer: LayerSurface,
+    pub surface: wl_surface::WlSurface,
     pub image: Vec<u32>,
     pub pool: SlotPool,
     pub buffer: Option<Buffer>,
@@ -121,9 +122,15 @@ pub struct Monitor {
 }
 
 impl Monitor {
-    pub fn new(layer: LayerSurface, rect: Rect, runtime_data: &RuntimeData) -> Self {
+    pub fn new(
+        layer: LayerSurface,
+        surface: wl_surface::WlSurface,
+        rect: Rect,
+        runtime_data: &RuntimeData,
+    ) -> Self {
         Self {
             layer,
+            surface,
             image: runtime_data
                 .image
                 .crop_imm(

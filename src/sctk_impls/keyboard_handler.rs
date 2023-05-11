@@ -74,7 +74,7 @@ impl KeyboardHandler for RuntimeData {
                     let monitor = self
                         .monitors
                         .iter()
-                        .find(|monitor| *monitor.layer.wl_surface() == selection.surface)
+                        .find(|monitor| monitor.surface == selection.surface)
                         .unwrap();
 
                     let mut rect = monitor.rect;
