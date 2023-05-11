@@ -100,7 +100,13 @@ fn main() {
 }
 
 fn gui(args: &Args) -> Option<(DynamicImage, Rect)> {
-    let conn = Connection::connect_to_env().unwrap();
+    let conn = Connection::connect_to_env();
+    if conn.is_err() {
+        log::error!("Could not connect to the Wayland server, make sure you run watershot within a Wayland session!");
+        std::process::exit(1);
+    }
+
+    let conn = conn.unwrap();
 
     let (globals, mut event_queue) = registry_queue_init(&conn).unwrap();
     let qh = event_queue.handle();
