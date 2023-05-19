@@ -234,6 +234,11 @@ impl Rect {
     }
 
     pub fn extend(&mut self, other: &Self) {
+        if *self == Self::default() {
+            *self = *other;
+            return;
+        }
+
         let x = self.x.min(other.x);
         let y = self.y.min(other.y);
         let width = (self.x - x + self.width).max(other.x - x + other.width);
