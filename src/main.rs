@@ -100,7 +100,12 @@ fn gui(args: &Args) -> Option<(DynamicImage, Rect)> {
         let info = runtime_data.output_state.info(&output).unwrap();
         let size = info
             .logical_size
-            .map(|(w, h)| (w as u32, h as u32))
+            .map(|(w, h)| {
+                (
+                    (w / info.scale_factor) as u32,
+                    (h / info.scale_factor) as u32,
+                )
+            })
             .expect("Can't determine monitor size!");
         let pos = info
             .logical_position
