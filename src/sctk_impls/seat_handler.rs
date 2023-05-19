@@ -38,11 +38,11 @@ impl SeatHandler for RuntimeData {
         {
             info!("Set pointer capability");
 
-            let (pointer, themed_pointer) = self
+            let themed_pointer = self
                 .seat_state
-                .get_pointer_with_theme(qh, &seat, ThemeSpec::default(), 1)
+                .get_pointer_with_theme(qh, &seat, ThemeSpec::default())
                 .expect("Failed to create themed pointer");
-            self.pointer = Some(pointer);
+            self.pointer = Some(themed_pointer.pointer().clone());
             self.themed_pointer = Some(themed_pointer);
         }
     }

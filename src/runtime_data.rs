@@ -14,8 +14,8 @@ use smithay_client_toolkit::{
     },
     registry::RegistryState,
     seat::{pointer::ThemedPointer, SeatState},
-    shell::layer::LayerShell,
-    shm::ShmState,
+    shell::wlr_layer::LayerShell,
+    shm::Shm,
 };
 
 use crate::{
@@ -33,7 +33,7 @@ pub struct RuntimeData {
     pub output_state: OutputState,
     pub compositor_state: CompositorState,
     pub layer_state: LayerShell,
-    pub shm_state: ShmState,
+    pub shm_state: Shm,
 
     // Devices
     pub keyboard: Option<wl_keyboard::WlKeyboard>,
@@ -92,7 +92,7 @@ impl RuntimeData {
             output_state: OutputState::new(globals, qh),
             compositor_state,
             layer_state: LayerShell::bind(globals, qh).expect("layer shell is not available"),
-            shm_state: ShmState::bind(globals, qh).expect("wl_shm is not available"),
+            shm_state: Shm::bind(globals, qh).expect("wl_shm is not available"),
             selection: Selection::Rectangle(None),
             config: Config::load().unwrap_or_default(),
             area: Rect::default(),
@@ -117,7 +117,7 @@ impl RuntimeData {
             MonitorIdentification::Surface(surface) => self
                 .monitors
                 .iter_mut()
-                .find(|window| *window.layer.wl_surface() == surface)
+                .find(|window| window.surface == surface)
                 .unwrap(),
         };
 
@@ -251,7 +251,7 @@ impl RuntimeData {
                     }
                 }
                 Selection::Display(Some(selection)) => {
-                    if selection.surface == *monitor.layer.wl_surface() {
+                    if selection.surface == monitor.surface {
                         let mut pb = PathBuilder::new();
                         pb.move_to(0.0, 0.0);
                         pb.line_to(monitor.rect.width as f32, 0.0);
@@ -305,20 +305,16 @@ impl RuntimeData {
                 }
             }
             monitor
-                .layer
-                .wl_surface()
+                .surface
                 .damage_buffer(rect.x, rect.y, rect.width, rect.height);
         }
 
         monitor.damage.clear();
 
-        monitor
-            .layer
-            .wl_surface()
-            .frame(qh, monitor.layer.wl_surface().clone());
+        monitor.surface.frame(qh, monitor.surface.clone());
         buffer
-            .attach_to(monitor.layer.wl_surface())
+            .attach_to(&monitor.surface)
             .expect("Failed to attach buffer to surface");
-        monitor.layer.wl_surface().commit();
+        monitor.surface.commit();
     }
 }

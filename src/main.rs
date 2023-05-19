@@ -1,4 +1,4 @@
-use std::io::Cursor;
+use std::io::{self, Cursor, Write};
 
 use chrono::Local;
 use clap::Parser;
@@ -7,7 +7,10 @@ use log::{error, info};
 use runtime_data::RuntimeData;
 use smithay_client_toolkit::{
     reexports::client::{globals::registry_queue_init, Connection},
-    shell::layer::{Anchor, KeyboardInteractivity, Layer, LayerSurface},
+    shell::{
+        wlr_layer::{Anchor, KeyboardInteractivity, Layer},
+        WaylandSurface,
+    },
 };
 use types::{Args, Config, ExitState, Monitor, Rect, SaveLocation, Selection};
 use wl_clipboard_rs::copy;
@@ -60,34 +63,50 @@ fn main() {
             }
         }
 
-        // Fork to serve copy requests
-        match unsafe { nix::unistd::fork() } {
-            Ok(nix::unistd::ForkResult::Parent { .. }) => {
-                info!("Forked to serve copy requests")
-            }
-            Ok(nix::unistd::ForkResult::Child) => {
-                // Save the selected image into the buffer
-                let mut buf = Cursor::new(Vec::new());
-                image
-                    .write_to(&mut buf, ImageFormat::Png)
-                    .expect("Failed to write image to buffer as PNG");
+        // Save the selected image into the buffer
+        let mut buf = Cursor::new(Vec::new());
+        image
+            .write_to(&mut buf, ImageFormat::Png)
+            .expect("Failed to write image to buffer as PNG");
 
-                // Serve copy requests
-                let mut opts = copy::Options::new();
-                opts.foreground(true);
-                opts.copy(
-                    copy::Source::Bytes(buf.into_inner().into_boxed_slice()),
-                    copy::MimeType::Autodetect,
-                )
-                .expect("Failed to serve copied image");
+        let buf = buf.into_inner();
+
+        if args.stdout {
+            if let Err(why) = io::stdout().lock().write_all(&buf) {
+                error!("Failed to write image content to stdout: {}", why);
             }
-            Err(why) => println!("Failed to fork: {}", why),
+        }
+
+        // Fork to serve copy requests
+        if args.copy {
+            match unsafe { nix::unistd::fork() } {
+                Ok(nix::unistd::ForkResult::Parent { .. }) => {
+                    info!("Forked to serve copy requests")
+                }
+                Ok(nix::unistd::ForkResult::Child) => {
+                    // Serve copy requests
+                    let mut opts = copy::Options::new();
+                    opts.foreground(true);
+                    opts.copy(
+                        copy::Source::Bytes(buf.into_boxed_slice()),
+                        copy::MimeType::Autodetect,
+                    )
+                    .expect("Failed to serve copied image");
+                }
+                Err(why) => println!("Failed to fork: {}", why),
+            }
         }
     }
 }
 
 fn gui(args: &Args) -> Option<(DynamicImage, Rect)> {
-    let conn = Connection::connect_to_env().unwrap();
+    let conn = Connection::connect_to_env();
+    if conn.is_err() {
+        log::error!("Could not connect to the Wayland server, make sure you run watershot within a Wayland session!");
+        std::process::exit(1);
+    }
+
+    let conn = conn.unwrap();
 
     let (globals, mut event_queue) = registry_queue_init(&conn).unwrap();
     let qh = event_queue.handle();
@@ -117,18 +136,23 @@ fn gui(args: &Args) -> Option<(DynamicImage, Rect)> {
         // Extend the area spanning all monitors with the current monitor
         runtime_data.area.extend(&rect);
 
-        let layer = LayerSurface::builder()
-            .size(size)
-            .anchor(Anchor::TOP)
-            .output(&output)
-            .exclusive_zone(-1) // Ignore any other exclusive zone
-            .keyboard_interactivity(KeyboardInteractivity::Exclusive)
-            .map(&qh, &runtime_data.layer_state, surface, Layer::Overlay)
-            .expect("Failed to create layer surface");
+        let layer = runtime_data.layer_state.create_layer_surface(
+            &qh,
+            surface.clone(),
+            Layer::Overlay,
+            Some("watershot"),
+            Some(&output),
+        );
+
+        layer.set_anchor(Anchor::TOP | Anchor::BOTTOM | Anchor::LEFT | Anchor::RIGHT);
+        layer.set_exclusive_zone(-1);
+        layer.set_keyboard_interactivity(KeyboardInteractivity::Exclusive);
+
+        layer.commit();
 
         runtime_data
             .monitors
-            .push(Monitor::new(layer, rect, &runtime_data));
+            .push(Monitor::new(layer, surface, rect, &runtime_data));
     }
 
     event_queue.roundtrip(&mut runtime_data).unwrap();
