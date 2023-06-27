@@ -8,9 +8,10 @@ edition = "2021"
 
 [dependencies]
 smithay-client-toolkit = "0.17.0"
+wayland-backend = { version = "0.1.2", features = ["client_system"] }
+wayland-client = { version = "0.30.2", features = ["calloop"] }
 image = { version = "0.24.5", features = ["webp-encoder"] }
 ron = "0.8.0"
-raqote = { version = "0.8.1", default-features = false }
 serde = { version = "1.0.152", features = ["derive"] }
 fontconfig = "0.6.0"
 fontdue = "0.7.2"
@@ -20,3 +21,7 @@ clap = { version = "4.0.32", features = ["derive"] }
 chrono = "0.4.23"
 env_logger = "0.10.0"
 log = "0.4.17"
+wgpu = "0.16.1"
+raw-window-handle = "0.5.2"
+pollster = "0.3.0"
+bytemuck = { version = "1.13.1", features = ["derive"] }

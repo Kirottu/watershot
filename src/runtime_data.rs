@@ -3,7 +3,7 @@ use std::{fs, io::Cursor, process::Command};
 use fontconfig::Fontconfig;
 use fontdue::{Font, FontSettings};
 use image::DynamicImage;
-use raqote::{DrawOptions, DrawTarget, Image, PathBuilder, Source, StrokeStyle};
+
 use smithay_client_toolkit::{
     compositor::CompositorState,
     output::OutputState,
@@ -19,8 +19,8 @@ use smithay_client_toolkit::{
 };
 
 use crate::{
-    handles,
-    traits::{Crop, DrawText, ToLocal},
+    rendering::{background::Background, shade::Overlay},
+    traits::ToLocal,
     types::{Args, ExitState, MonitorIdentification},
     Config, Monitor, Rect, Selection,
 };
@@ -43,7 +43,7 @@ pub struct RuntimeData {
     pub themed_pointer: Option<ThemedPointer>,
 
     /// Combined area of all monitors
-    pub area: Rect,
+    pub area: Rect<i32>,
     pub selection: Selection,
     pub monitors: Vec<Monitor>,
     pub config: Config,
@@ -51,6 +51,14 @@ pub struct RuntimeData {
     pub font: Vec<Font>,
     pub image: DynamicImage,
     pub exit: ExitState,
+
+    pub instance: wgpu::Instance,
+    pub device: wgpu::Device,
+    pub adapter: wgpu::Adapter,
+    pub queue: wgpu::Queue,
+
+    pub background: Background,
+    pub overlay: Overlay,
 }
 
 impl RuntimeData {
@@ -84,7 +92,26 @@ impl RuntimeData {
         let compositor_state =
             CompositorState::bind(globals, qh).expect("wl_compositor is not available");
 
+        let instance = wgpu::Instance::new(wgpu::InstanceDescriptor {
+            backends: wgpu::Backends::all(),
+            ..Default::default()
+        });
+
         let pointer_surface = compositor_state.create_surface(qh);
+
+        let adapter =
+            pollster::block_on(instance.request_adapter(&wgpu::RequestAdapterOptionsBase {
+                compatible_surface: None,
+                ..Default::default()
+            }))
+            .unwrap();
+
+        let (device, queue) =
+            pollster::block_on(adapter.request_device(&Default::default(), None)).unwrap();
+
+        // Different rendering stages
+        let background = Background::new(&device);
+        let overlay = Overlay::new(&device, &config);
 
         RuntimeData {
             registry_state: RegistryState::new(globals),
@@ -94,7 +121,7 @@ impl RuntimeData {
             layer_state: LayerShell::bind(globals, qh).expect("layer shell is not available"),
             shm_state: Shm::bind(globals, qh).expect("wl_shm is not available"),
             selection: Selection::Rectangle(None),
-            config: Config::load().unwrap_or_default(),
+            config,
             area: Rect::default(),
             monitors: Vec::new(),
             image,
@@ -104,6 +131,12 @@ impl RuntimeData {
             themed_pointer: None,
             exit: ExitState::None,
             pointer_surface,
+            instance,
+            adapter,
+            device,
+            queue,
+            background,
+            overlay,
         }
     }
 
@@ -117,11 +150,40 @@ impl RuntimeData {
             MonitorIdentification::Surface(surface) => self
                 .monitors
                 .iter_mut()
-                .find(|window| window.surface == surface)
+                .find(|window| window.wl_surface == surface)
                 .unwrap(),
         };
 
-        let buffer = monitor.buffer.get_or_insert_with(|| {
+        monitor.shade.update_vertices(
+            &monitor.rect,
+            &monitor.wl_surface,
+            &self.selection,
+            &self.config,
+            &self.queue,
+        );
+
+        let surface_texture = monitor.surface.get_current_texture().unwrap();
+        let texture_view = surface_texture
+            .texture
+            .create_view(&wgpu::TextureViewDescriptor::default());
+
+        let mut encoder = self
+            .device
+            .create_command_encoder(&wgpu::CommandEncoderDescriptor::default());
+
+        self.background.render(&mut encoder, &texture_view, monitor);
+        self.overlay.render(&mut encoder, &texture_view, monitor);
+
+        self.queue.submit(Some(encoder.finish()));
+
+        monitor
+            .wl_surface
+            .damage(0, 0, monitor.rect.width, monitor.rect.height);
+        monitor.wl_surface.frame(qh, monitor.wl_surface.clone());
+        surface_texture.present();
+        monitor.wl_surface.commit();
+
+        /*let buffer = monitor.buffer.get_or_insert_with(|| {
             monitor
                 .pool
                 .create_buffer(
@@ -251,7 +313,7 @@ impl RuntimeData {
                     }
                 }
                 Selection::Display(Some(selection)) => {
-                    if selection.surface == monitor.surface {
+                    if selection.surface == monitor.wl_surface {
                         let mut pb = PathBuilder::new();
                         pb.move_to(0.0, 0.0);
                         pb.line_to(monitor.rect.width as f32, 0.0);
@@ -305,16 +367,16 @@ impl RuntimeData {
                 }
             }
             monitor
-                .surface
+                .wl_surface
                 .damage_buffer(rect.x, rect.y, rect.width, rect.height);
         }
 
         monitor.damage.clear();
 
-        monitor.surface.frame(qh, monitor.surface.clone());
+        monitor.wl_surface.frame(qh, monitor.wl_surface.clone());
         buffer
-            .attach_to(&monitor.surface)
+            .attach_to(&monitor.wl_surface)
             .expect("Failed to attach buffer to surface");
-        monitor.surface.commit();
+        monitor.wl_surface.commit();*/
     }
 }

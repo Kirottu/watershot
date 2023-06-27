@@ -27,7 +27,7 @@ impl PointerHandler for RuntimeData {
             let layer = self
                 .monitors
                 .iter()
-                .find(|layer| layer.surface == event.surface)
+                .find(|layer| layer.wl_surface == event.surface)
                 .unwrap();
             let global_pos = event.position.to_global(&layer.rect);
 

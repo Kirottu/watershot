@@ -27,6 +27,27 @@ impl LayerShellHandler for RuntimeData {
             1,
         );
 
+        let monitor = self
+            .monitors
+            .iter_mut()
+            .find(|window| window.layer == *layer)
+            .unwrap();
+        let cap = monitor.surface.get_capabilities(&self.adapter);
+        monitor.surface.configure(
+            &self.device,
+            &wgpu::SurfaceConfiguration {
+                usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
+                format: cap.formats[0],
+                width: monitor.rect.width as u32,
+                height: monitor.rect.height as u32,
+                present_mode: wgpu::PresentMode::Mailbox,
+                alpha_mode: wgpu::CompositeAlphaMode::Auto,
+                view_formats: vec![cap.formats[0]],
+            },
+        );
+
+        log::info!("{:?}", cap.formats[0]);
+
         self.draw(MonitorIdentification::Layer(layer.clone()), qh);
     }
 }

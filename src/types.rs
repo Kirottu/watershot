@@ -1,15 +1,26 @@
 use std::{env, fs};
 
 use clap::{Parser, Subcommand};
-use raqote::SolidSource;
+use image::GenericImageView;
+use raw_window_handle::{
+    HasRawDisplayHandle, HasRawWindowHandle, RawDisplayHandle, RawWindowHandle,
+    WaylandDisplayHandle, WaylandWindowHandle,
+};
 use serde::Deserialize;
 use smithay_client_toolkit::{
-    reexports::client::protocol::wl_surface,
+    reexports::client::{protocol::wl_surface, Connection},
     shell::wlr_layer::LayerSurface,
     shm::slot::{Buffer, SlotPool},
 };
+use wayland_client::Proxy;
 
-use crate::runtime_data::RuntimeData;
+use crate::{
+    rendering::{
+        background::{Background, MonitorBackground},
+        shade::MonitorOverlay,
+    },
+    runtime_data::RuntimeData,
+};
 
 #[derive(Parser)]
 #[command(author, version, about)]
@@ -67,22 +78,22 @@ impl Default for Config {
             line_width: 1,
             display_highlight_width: 5,
             selection_color: Color {
-                r: 255,
-                g: 255,
-                b: 255,
-                a: 255,
+                r: 1.0,
+                g: 1.0,
+                b: 1.0,
+                a: 1.0,
             },
             shade_color: Color {
-                r: 0,
-                g: 0,
-                b: 0,
-                a: 127,
+                r: 0.0,
+                g: 0.0,
+                b: 0.0,
+                a: 0.5,
             },
             text_color: Color {
-                r: 190,
-                g: 190,
-                b: 190,
-                a: 255,
+                r: 0.8,
+                g: 0.8,
+                b: 0.8,
+                a: 1.0,
             },
             size_text_size: 15,
             mode_text_size: 30,
@@ -91,71 +102,48 @@ impl Default for Config {
     }
 }
 
-#[derive(Debug, Deserialize, Copy, Clone)]
+#[repr(C)]
+#[derive(Debug, Deserialize, Copy, Clone, bytemuck::Pod, bytemuck::Zeroable)]
 pub struct Color {
-    pub r: u8,
-    pub g: u8,
-    pub b: u8,
-    pub a: u8,
-}
-
-impl From<Color> for SolidSource {
-    fn from(color: Color) -> Self {
-        Self {
-            r: color.r,
-            g: color.g,
-            b: color.b,
-            a: color.a,
-        }
-    }
+    pub r: f32,
+    pub g: f32,
+    pub b: f32,
+    pub a: f32,
 }
 
 /// Represents the layer and the monitor it resides on
 pub struct Monitor {
     pub layer: LayerSurface,
-    pub surface: wl_surface::WlSurface,
-    pub image: Vec<u32>,
-    pub pool: SlotPool,
-    pub buffer: Option<Buffer>,
-    pub rect: Rect,
-    pub damage: Vec<Rect>,
+    pub wl_surface: wl_surface::WlSurface,
+    pub rect: Rect<i32>,
+    pub damage: Vec<Rect<i32>>,
+
+    // Wgpu stuff
+    pub surface: wgpu::Surface,
+
+    pub shade: MonitorOverlay,
+    pub background: MonitorBackground,
 }
 
 impl Monitor {
     pub fn new(
         layer: LayerSurface,
-        surface: wl_surface::WlSurface,
-        rect: Rect,
+        wl_surface: wl_surface::WlSurface,
+        surface: wgpu::Surface,
+        rect: Rect<i32>,
         runtime_data: &RuntimeData,
     ) -> Self {
+        let background = MonitorBackground::new(&rect, runtime_data);
+        let shade = MonitorOverlay::new(runtime_data);
+
         Self {
             layer,
-            surface,
-            image: runtime_data
-                .image
-                .crop_imm(
-                    (rect.x - runtime_data.area.x) as u32,
-                    (rect.y - runtime_data.area.y) as u32,
-                    rect.width as u32,
-                    rect.height as u32,
-                )
-                .to_rgba8()
-                .chunks_exact(4)
-                .map(|chunks| {
-                    SolidSource::from_unpremultiplied_argb(
-                        chunks[3], chunks[0], chunks[1], chunks[2],
-                    )
-                    .to_u32()
-                })
-                .collect(),
-            buffer: None,
+            wl_surface,
             rect,
-            pool: SlotPool::new(
-                rect.width as usize * rect.height as usize * 4,
-                &runtime_data.shm_state,
-            )
-            .expect("Failed to create pool!"),
             damage: vec![rect],
+            surface,
+            background,
+            shade,
         }
     }
 }
@@ -169,7 +157,7 @@ pub struct Extents {
 }
 
 impl Extents {
-    pub fn to_rect(self) -> Rect {
+    pub fn to_rect(self) -> Rect<i32> {
         let (x, width) = if self.start_x < self.end_x {
             (self.start_x, self.end_x - self.start_x)
         } else {
@@ -189,7 +177,7 @@ impl Extents {
         }
     }
 
-    pub fn to_rect_clamped(self, area: &Rect) -> Rect {
+    pub fn to_rect_clamped(self, area: &Rect<i32>) -> Rect<i32> {
         let mut rect = self.to_rect();
 
         rect.x = rect.x.clamp(area.x, area.x + area.width - rect.width);
@@ -200,15 +188,15 @@ impl Extents {
 }
 
 #[derive(Debug, Default, Clone, Copy, Eq, PartialEq)]
-pub struct Rect {
-    pub x: i32,
-    pub y: i32,
-    pub width: i32,
-    pub height: i32,
+pub struct Rect<T> {
+    pub x: T,
+    pub y: T,
+    pub width: T,
+    pub height: T,
 }
 
-impl Rect {
-    pub fn new(x: i32, y: i32, width: i32, height: i32) -> Self {
+impl<T> Rect<T> {
+    pub fn new(x: T, y: T, width: T, height: T) -> Self {
         Self {
             x,
             y,
@@ -216,7 +204,27 @@ impl Rect {
             height,
         }
     }
+}
 
+impl Rect<f32> {
+    pub fn padded(self, amount: f32) -> Self {
+        let mut width = self.width + 2.0 * amount;
+        let mut height = self.height + 2.0 * amount;
+
+        // Make sure we have no negative size
+        if width < 0.0 {
+            width = 0.0;
+        }
+
+        if height < 0.0 {
+            height = 0.0;
+        }
+
+        Self::new(self.x - amount, self.y - amount, width, height)
+    }
+}
+
+impl Rect<i32> {
     pub fn contains(&self, x: i32, y: i32) -> bool {
         x >= self.x && x <= self.x + self.width && y >= self.y && y <= self.y + self.height
     }
@@ -345,10 +353,19 @@ impl Rect {
             res.x = res.x.max(area.x);
             res.y = res.y.max(area.y);
 
-            res.width = (res.width + res.x).clamp(0, area.width + area.x) - res.x;
-            res.height = (res.height + res.y).clamp(0, area.height + area.y) - res.y;
+            res.width = (self.x + self.width - res.x).clamp(0, area.width);
+            res.height = (self.y + self.height - res.y).clamp(0, area.height);
 
             Some(res)
+        }
+    }
+
+    pub fn to_render_space(self, width: f32, height: f32) -> Rect<f32> {
+        Rect {
+            x: (self.x as f32 / width - 0.5) * 2.0,
+            y: -(self.y as f32 / height - 0.5) * 2.0,
+            width: (self.width as f32 / width) * 2.0,
+            height: (self.height as f32 / height) * 2.0,
         }
     }
 }
@@ -379,12 +396,14 @@ pub struct RectangleSelection {
 }
 
 pub struct DisplaySelection {
-    pub surface: wl_surface::WlSurface,
+    pub wl_surface: wl_surface::WlSurface,
 }
 
 impl DisplaySelection {
     pub fn new(surface: wl_surface::WlSurface) -> Self {
-        Self { surface }
+        Self {
+            wl_surface: surface,
+        }
     }
 }
 
@@ -414,7 +433,39 @@ pub enum ExitState {
     /// Only exit
     ExitOnly,
     /// Exit and perform actions on the selection
-    ExitWithSelection(Rect),
+    ExitWithSelection(Rect<i32>),
+}
+
+pub struct RawWgpuHandles {
+    window: RawWindowHandle,
+    display: RawDisplayHandle,
+}
+
+impl RawWgpuHandles {
+    pub fn new(conn: &Connection, surface: &wl_surface::WlSurface) -> Self {
+        let mut display_handle = WaylandDisplayHandle::empty();
+        display_handle.display = conn.backend().display_ptr() as *mut _;
+
+        let mut window_handle = WaylandWindowHandle::empty();
+        window_handle.surface = surface.id().as_ptr() as *mut _;
+
+        Self {
+            window: RawWindowHandle::Wayland(window_handle),
+            display: RawDisplayHandle::Wayland(display_handle),
+        }
+    }
+}
+
+unsafe impl HasRawWindowHandle for RawWgpuHandles {
+    fn raw_window_handle(&self) -> RawWindowHandle {
+        self.window
+    }
+}
+
+unsafe impl HasRawDisplayHandle for RawWgpuHandles {
+    fn raw_display_handle(&self) -> RawDisplayHandle {
+        self.display
+    }
 }
 
 #[cfg(test)]

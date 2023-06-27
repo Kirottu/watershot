@@ -12,7 +12,7 @@ use smithay_client_toolkit::{
         WaylandSurface,
     },
 };
-use types::{Args, Config, ExitState, Monitor, Rect, SaveLocation, Selection};
+use types::{Args, Config, ExitState, Monitor, RawWgpuHandles, Rect, SaveLocation, Selection};
 use wl_clipboard_rs::copy;
 
 mod macros;
@@ -28,6 +28,10 @@ mod sctk_impls {
     mod provides_registry_state;
     mod seat_handler;
     mod shm_handler;
+}
+mod rendering {
+    pub mod background;
+    pub mod shade;
 }
 
 fn main() {
@@ -99,7 +103,7 @@ fn main() {
     }
 }
 
-fn gui(args: &Args) -> Option<(DynamicImage, Rect)> {
+fn gui(args: &Args) -> Option<(DynamicImage, Rect<i32>)> {
     let conn = Connection::connect_to_env();
     if conn.is_err() {
         log::error!("Could not connect to the Wayland server, make sure you run watershot within a Wayland session!");
@@ -124,7 +128,7 @@ fn gui(args: &Args) -> Option<(DynamicImage, Rect)> {
         let pos = info
             .logical_position
             .expect("Can't determine monitor position!");
-        let surface = runtime_data.compositor_state.create_surface(&qh);
+        let wl_surface = runtime_data.compositor_state.create_surface(&qh);
 
         let rect = Rect {
             x: pos.0,
@@ -138,7 +142,7 @@ fn gui(args: &Args) -> Option<(DynamicImage, Rect)> {
 
         let layer = runtime_data.layer_state.create_layer_surface(
             &qh,
-            surface.clone(),
+            wl_surface.clone(),
             Layer::Overlay,
             Some("watershot"),
             Some(&output),
@@ -150,9 +154,17 @@ fn gui(args: &Args) -> Option<(DynamicImage, Rect)> {
 
         layer.commit();
 
-        runtime_data
-            .monitors
-            .push(Monitor::new(layer, surface, rect, &runtime_data));
+        let handle = RawWgpuHandles::new(&conn, &wl_surface);
+
+        let surface = unsafe { runtime_data.instance.create_surface(&handle).unwrap() };
+
+        runtime_data.monitors.push(Monitor::new(
+            layer,
+            wl_surface,
+            surface,
+            rect,
+            &runtime_data,
+        ));
     }
 
     event_queue.roundtrip(&mut runtime_data).unwrap();
