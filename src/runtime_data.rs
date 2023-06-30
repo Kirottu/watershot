@@ -42,6 +42,8 @@ pub struct RuntimeData {
 
     /// Combined area of all monitors
     pub area: Rect<i32>,
+    /// The scale factor of the screenshot image
+    pub scale_factor: f32,
     pub selection: Selection,
     pub monitors: Vec<Monitor>,
     pub config: Config,
@@ -119,6 +121,8 @@ impl RuntimeData {
             config,
             area: Rect::default(),
             monitors: Vec::new(),
+            // Set later
+            scale_factor: 0.0,
             image,
             keyboard: None,
             pointer: None,

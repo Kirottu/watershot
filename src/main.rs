@@ -35,12 +35,12 @@ fn main() {
     let args = Args::parse();
     env_logger::init();
 
-    if let Some((image, rect)) = gui(&args) {
+    if let Some((image, rect, scale_factor)) = gui(&args) {
         let image = image.crop_imm(
-            rect.x as u32,
-            rect.y as u32,
-            rect.width as u32,
-            rect.height as u32,
+            (rect.x as f32 / scale_factor) as u32,
+            (rect.y as f32 / scale_factor) as u32,
+            (rect.width as f32 / scale_factor) as u32,
+            (rect.height as f32 / scale_factor) as u32,
         );
 
         // Save the file if an argument for that is present
@@ -100,7 +100,7 @@ fn main() {
     }
 }
 
-fn gui(args: &Args) -> Option<(DynamicImage, Rect<i32>)> {
+fn gui(args: &Args) -> Option<(DynamicImage, Rect<i32>, f32)> {
     let conn = Connection::connect_to_env();
     if conn.is_err() {
         log::error!("Could not connect to the Wayland server, make sure you run watershot within a Wayland session!");
@@ -116,26 +116,35 @@ fn gui(args: &Args) -> Option<(DynamicImage, Rect<i32>)> {
     // Fetch the outputs from the compositor
     event_queue.roundtrip(&mut runtime_data).unwrap();
 
-    for output in runtime_data.output_state.outputs() {
-        let info = runtime_data.output_state.info(&output).unwrap();
-        let size = info
-            .logical_size
-            .map(|(w, h)| (w as u32, h as u32))
-            .expect("Can't determine monitor size!");
-        let pos = info
-            .logical_position
-            .expect("Can't determine monitor position!");
+    let sizes = runtime_data
+        .output_state
+        .outputs()
+        .map(|output| {
+            let info = runtime_data.output_state.info(&output).unwrap();
+            let size = info
+                .logical_size
+                .map(|(w, h)| (w as u32, h as u32))
+                .expect("Can't determine monitor size!");
+            let pos = info
+                .logical_position
+                .expect("Can't determine monitor position!");
+
+            let rect = Rect {
+                x: pos.0,
+                y: pos.1,
+                width: size.0 as i32,
+                height: size.1 as i32,
+            };
+            // Extend the area spanning all monitors with the current monitor
+            runtime_data.area.extend(&rect);
+            (rect, output)
+        })
+        .collect::<Vec<_>>();
+
+    runtime_data.scale_factor = runtime_data.area.width as f32 / runtime_data.image.width() as f32;
+
+    for (rect, output) in sizes {
         let wl_surface = runtime_data.compositor_state.create_surface(&qh);
-
-        let rect = Rect {
-            x: pos.0,
-            y: pos.1,
-            width: size.0 as i32,
-            height: size.1 as i32,
-        };
-
-        // Extend the area spanning all monitors with the current monitor
-        runtime_data.area.extend(&rect);
 
         let layer = runtime_data.layer_state.create_layer_surface(
             &qh,
@@ -170,7 +179,9 @@ fn gui(args: &Args) -> Option<(DynamicImage, Rect<i32>)> {
         event_queue.blocking_dispatch(&mut runtime_data).unwrap();
         match runtime_data.exit {
             ExitState::ExitOnly => return None,
-            ExitState::ExitWithSelection(rect) => return Some((runtime_data.image, rect)),
+            ExitState::ExitWithSelection(rect) => {
+                return Some((runtime_data.image, rect, runtime_data.scale_factor))
+            }
             ExitState::None => (),
         }
     }

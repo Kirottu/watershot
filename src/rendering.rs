@@ -376,10 +376,10 @@ impl MonSpecificRendering {
         let background = runtime_data
             .image
             .crop_imm(
-                (rect.x - runtime_data.area.x) as u32,
-                (rect.y - runtime_data.area.y) as u32,
-                rect.width as u32,
-                rect.height as u32,
+                ((rect.x - runtime_data.area.x) as f32 / runtime_data.scale_factor) as u32,
+                ((rect.y - runtime_data.area.y) as f32 / runtime_data.scale_factor) as u32,
+                (rect.width as f32 / runtime_data.scale_factor) as u32,
+                (rect.height as f32 / runtime_data.scale_factor) as u32,
             )
             .to_rgba8();
 
