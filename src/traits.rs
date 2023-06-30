@@ -16,6 +16,10 @@ pub trait DistanceTo<T> {
     fn distance_to(&self, other: &(T, T)) -> T;
 }
 
+pub trait Contains<T> {
+    fn contains(&self, item: &T) -> bool;
+}
+
 impl ToRender<Rect<f32>, i32> for Rect<i32> {
     fn to_render(&self, width: i32, height: i32) -> Rect<f32> {
         let width = width as f32;
@@ -73,5 +77,23 @@ impl DistanceTo<i32> for (i32, i32) {
 impl ToGlobal<(i32, i32)> for (f64, f64) {
     fn to_global(&self, rect: &Rect<i32>) -> (i32, i32) {
         (self.0 as i32 + rect.x, self.1 as i32 + rect.y)
+    }
+}
+
+impl Contains<(i32, i32)> for Rect<i32> {
+    fn contains(&self, pos: &(i32, i32)) -> bool {
+        pos.0 >= self.x
+            && pos.0 <= self.x + self.width
+            && pos.1 >= self.y
+            && pos.1 <= self.y + self.height
+    }
+}
+
+impl Contains<Rect<i32>> for Rect<i32> {
+    fn contains(&self, other: &Rect<i32>) -> bool {
+        self.x <= other.x
+            && self.y <= other.y
+            && self.x + self.width >= other.x + other.width
+            && self.y + self.height >= other.y + other.height
     }
 }

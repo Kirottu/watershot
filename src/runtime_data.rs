@@ -50,6 +50,7 @@ pub struct RuntimeData {
     pub font: wgpu_text::font::FontArc,
     pub image: DynamicImage,
     pub exit: ExitState,
+    pub args: Args,
 
     pub instance: wgpu::Instance,
     pub device: wgpu::Device,
@@ -60,7 +61,7 @@ pub struct RuntimeData {
 }
 
 impl RuntimeData {
-    pub fn new(qh: &QueueHandle<Self>, globals: &GlobalList, args: &Args) -> Self {
+    pub fn new(qh: &QueueHandle<Self>, globals: &GlobalList, args: Args) -> Self {
         let output = Command::new(args.grim.as_ref().unwrap_or(&"grim".to_string()))
             .arg("-t")
             .arg("ppm")
@@ -128,6 +129,7 @@ impl RuntimeData {
             pointer: None,
             themed_pointer: None,
             exit: ExitState::None,
+            args,
             pointer_surface,
             instance,
             adapter,

@@ -8,7 +8,7 @@ use smithay_client_toolkit::{
 use crate::{
     handles,
     runtime_data::RuntimeData,
-    traits::{DistanceTo, ToGlobal},
+    traits::{Contains, DistanceTo, ToGlobal},
     types::{DisplaySelection, RectangleSelection, Selection, SelectionModifier},
 };
 
@@ -105,11 +105,7 @@ impl PointerHandler for RuntimeData {
                                         return;
                                     }
                                 }
-                                if selection
-                                    .extents
-                                    .to_rect()
-                                    .contains(global_pos.0, global_pos.1)
-                                {
+                                if selection.extents.to_rect().contains(&global_pos) {
                                     selection.modifier = Some(SelectionModifier::Center(
                                         global_pos.0,
                                         global_pos.1,

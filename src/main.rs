@@ -5,14 +5,9 @@ use clap::Parser;
 use image::{DynamicImage, ImageFormat};
 use log::{error, info};
 use runtime_data::RuntimeData;
-use smithay_client_toolkit::{
-    reexports::client::{globals::registry_queue_init, Connection},
-    shell::{
-        wlr_layer::{Anchor, KeyboardInteractivity, Layer},
-        WaylandSurface,
-    },
-};
-use types::{Args, Config, ExitState, Monitor, RawWgpuHandles, Rect, SaveLocation, Selection};
+use smithay_client_toolkit::reexports::client::{globals::registry_queue_init, Connection};
+use traits::{Contains, ToLocal};
+use types::{Args, Config, ExitState, Monitor, Rect, SaveLocation, Selection};
 use wl_clipboard_rs::copy;
 
 mod macros;
@@ -35,14 +30,7 @@ fn main() {
     let args = Args::parse();
     env_logger::init();
 
-    if let Some((image, rect, scale_factor)) = gui(&args) {
-        let image = image.crop_imm(
-            (rect.x as f32 / scale_factor) as u32,
-            (rect.y as f32 / scale_factor) as u32,
-            (rect.width as f32 / scale_factor) as u32,
-            (rect.height as f32 / scale_factor) as u32,
-        );
-
+    if let Some(image) = gui(&args) {
         // Save the file if an argument for that is present
         if let Some(save_location) = &args.save {
             match save_location {
@@ -100,7 +88,7 @@ fn main() {
     }
 }
 
-fn gui(args: &Args) -> Option<(DynamicImage, Rect<i32>, f32)> {
+fn gui(args: &Args) -> Option<DynamicImage> {
     let conn = Connection::connect_to_env();
     if conn.is_err() {
         log::error!("Could not connect to the Wayland server, make sure you run watershot within a Wayland session!");
@@ -111,11 +99,11 @@ fn gui(args: &Args) -> Option<(DynamicImage, Rect<i32>, f32)> {
 
     let (globals, mut event_queue) = registry_queue_init(&conn).unwrap();
     let qh = event_queue.handle();
-    let mut runtime_data = RuntimeData::new(&qh, &globals, args);
+    let mut runtime_data = RuntimeData::new(&qh, &globals, args.clone());
 
     // Fetch the outputs from the compositor
     event_queue.roundtrip(&mut runtime_data).unwrap();
-
+    // Has to be iterated first to get the full area size
     let sizes = runtime_data
         .output_state
         .outputs()
@@ -135,42 +123,19 @@ fn gui(args: &Args) -> Option<(DynamicImage, Rect<i32>, f32)> {
                 width: size.0 as i32,
                 height: size.1 as i32,
             };
+
             // Extend the area spanning all monitors with the current monitor
             runtime_data.area.extend(&rect);
-            (rect, output)
+            (rect, output, info)
         })
         .collect::<Vec<_>>();
 
-    runtime_data.scale_factor = runtime_data.area.width as f32 / runtime_data.image.width() as f32;
+    runtime_data.scale_factor = runtime_data.image.width() as f32 / runtime_data.area.width as f32;
 
-    for (rect, output) in sizes {
-        let wl_surface = runtime_data.compositor_state.create_surface(&qh);
-
-        let layer = runtime_data.layer_state.create_layer_surface(
-            &qh,
-            wl_surface.clone(),
-            Layer::Overlay,
-            Some("watershot"),
-            Some(&output),
-        );
-
-        layer.set_anchor(Anchor::TOP | Anchor::BOTTOM | Anchor::LEFT | Anchor::RIGHT);
-        layer.set_exclusive_zone(-1);
-        layer.set_keyboard_interactivity(KeyboardInteractivity::Exclusive);
-
-        layer.commit();
-
-        let handle = RawWgpuHandles::new(&conn, &wl_surface);
-
-        let surface = unsafe { runtime_data.instance.create_surface(&handle).unwrap() };
-
-        runtime_data.monitors.push(Monitor::new(
-            layer,
-            wl_surface,
-            surface,
-            rect,
-            &runtime_data,
-        ));
+    for (rect, output, info) in sizes {
+        runtime_data
+            .monitors
+            .push(Monitor::new(rect, &qh, &conn, output, info, &runtime_data));
     }
 
     event_queue.roundtrip(&mut runtime_data).unwrap();
@@ -180,7 +145,31 @@ fn gui(args: &Args) -> Option<(DynamicImage, Rect<i32>, f32)> {
         match runtime_data.exit {
             ExitState::ExitOnly => return None,
             ExitState::ExitWithSelection(rect) => {
-                return Some((runtime_data.image, rect, runtime_data.scale_factor))
+                let image = match runtime_data.monitors.into_iter().find_map(|mon| {
+                    if mon.rect.contains(&rect) {
+                        Some(mon)
+                    } else {
+                        None
+                    }
+                }) {
+                    Some(mon) => {
+                        let rect = rect.to_local(&mon.rect);
+                        mon.image.crop_imm(
+                            rect.x as u32,
+                            rect.y as u32,
+                            rect.width as u32,
+                            rect.height as u32,
+                        )
+                    }
+                    None => runtime_data.image.crop_imm(
+                        (rect.x as f32 * runtime_data.scale_factor) as u32,
+                        (rect.y as f32 * runtime_data.scale_factor) as u32,
+                        (rect.width as f32 * runtime_data.scale_factor) as u32,
+                        (rect.height as f32 * runtime_data.scale_factor) as u32,
+                    ),
+                };
+
+                return Some(image);
             }
             ExitState::None => (),
         }

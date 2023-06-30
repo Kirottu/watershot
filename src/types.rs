@@ -1,20 +1,27 @@
-use std::{env, fs};
+use std::{env, fs, io::Cursor, process::Command};
 
 use clap::{Parser, Subcommand};
+use image::DynamicImage;
 use raw_window_handle::{
     HasRawDisplayHandle, HasRawWindowHandle, RawDisplayHandle, RawWindowHandle,
     WaylandDisplayHandle, WaylandWindowHandle,
 };
 use serde::Deserialize;
 use smithay_client_toolkit::{
-    reexports::client::{protocol::wl_surface, Connection},
-    shell::wlr_layer::LayerSurface,
+    output::OutputInfo,
+    shell::{
+        wlr_layer::{Anchor, KeyboardInteractivity, Layer, LayerSurface},
+        WaylandSurface,
+    },
 };
-use wayland_client::Proxy;
+use wayland_client::{
+    protocol::{wl_output, wl_surface},
+    Connection, Proxy, QueueHandle,
+};
 
 use crate::{rendering::MonSpecificRendering, runtime_data::RuntimeData};
 
-#[derive(Parser)]
+#[derive(Parser, Clone)]
 #[command(author, version, about)]
 pub struct Args {
     /// Copy the screenshot after exit
@@ -34,7 +41,7 @@ pub struct Args {
     pub save: Option<SaveLocation>,
 }
 
-#[derive(Subcommand)]
+#[derive(Subcommand, Clone)]
 pub enum SaveLocation {
     /// The path to save the image to
     Path { path: String },
@@ -115,22 +122,73 @@ pub struct Monitor {
     pub wl_surface: wl_surface::WlSurface,
     pub surface: wgpu::Surface,
     pub rect: Rect<i32>,
+    pub image: DynamicImage,
+    /// The wayland scale factor for this monitor
+    pub scale_factor: i32,
     pub rendering: MonSpecificRendering,
 }
 
 impl Monitor {
     pub fn new(
-        layer: LayerSurface,
-        wl_surface: wl_surface::WlSurface,
-        surface: wgpu::Surface,
         rect: Rect<i32>,
+        qh: &QueueHandle<RuntimeData>,
+        conn: &Connection,
+        output: wl_output::WlOutput,
+        info: OutputInfo,
         runtime_data: &RuntimeData,
     ) -> Self {
-        let rendering = MonSpecificRendering::new(&rect, runtime_data);
+        let wl_surface = runtime_data.compositor_state.create_surface(qh);
+
+        let layer = runtime_data.layer_state.create_layer_surface(
+            qh,
+            wl_surface.clone(),
+            Layer::Overlay,
+            Some("watershot"),
+            Some(&output),
+        );
+
+        // Set the right scale for the buffer
+        wl_surface.set_buffer_scale(info.scale_factor);
+
+        layer.set_anchor(Anchor::TOP | Anchor::BOTTOM | Anchor::LEFT | Anchor::RIGHT);
+        layer.set_exclusive_zone(-1);
+        layer.set_keyboard_interactivity(KeyboardInteractivity::Exclusive);
+
+        layer.commit();
+
+        let handle = RawWgpuHandles::new(conn, &wl_surface);
+
+        // Each monitor also gets their own screenshot to preserve clarity as much as possible
+        let grim_output = Command::new(
+            runtime_data
+                .args
+                .grim
+                .as_ref()
+                .unwrap_or(&"grim".to_string()),
+        )
+        .arg("-t")
+        .arg("ppm")
+        .arg("-o")
+        .arg(info.name.as_ref().unwrap())
+        .arg("-")
+        .output()
+        .expect("Failed to run grim command!")
+        .stdout;
+
+        let image =
+            image::io::Reader::with_format(Cursor::new(grim_output), image::ImageFormat::Pnm)
+                .decode()
+                .expect("Failed to parse grim image!");
+
+        let surface = unsafe { runtime_data.instance.create_surface(&handle).unwrap() };
+        let rendering = MonSpecificRendering::new(&rect, &info, image.to_rgba8(), runtime_data);
+
         Self {
             layer,
             wl_surface,
             rect,
+            image,
+            scale_factor: info.scale_factor,
             surface,
             rendering,
         }
@@ -196,10 +254,6 @@ impl<T> Rect<T> {
 }
 
 impl Rect<i32> {
-    pub fn contains(&self, x: i32, y: i32) -> bool {
-        x >= self.x && x <= self.x + self.width && y >= self.y && y <= self.y + self.height
-    }
-
     pub fn intersects(&self, other: &Self) -> bool {
         ((self.x + self.width).min(other.x + other.width) - self.x.max(other.x)) > 0
             && ((self.y + self.height).min(other.y + other.height) - self.y.max(other.y)) > 0

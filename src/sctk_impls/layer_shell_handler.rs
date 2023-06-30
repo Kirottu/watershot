@@ -27,6 +27,8 @@ impl LayerShellHandler for RuntimeData {
             1,
         );
 
+        log::info!("{:?}", _configure);
+
         let monitor = self
             .monitors
             .iter_mut()
@@ -39,10 +41,10 @@ impl LayerShellHandler for RuntimeData {
             &wgpu::SurfaceConfiguration {
                 usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
                 format: cap.formats[0],
-                width: monitor.rect.width as u32,
-                height: monitor.rect.height as u32,
+                width: (monitor.rect.width * monitor.scale_factor) as u32,
+                height: (monitor.rect.height * monitor.scale_factor) as u32,
                 present_mode: wgpu::PresentMode::Mailbox,
-                alpha_mode: wgpu::CompositeAlphaMode::PreMultiplied,
+                alpha_mode: wgpu::CompositeAlphaMode::Opaque,
                 view_formats: vec![cap.formats[0]],
             },
         );

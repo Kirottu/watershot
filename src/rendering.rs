@@ -1,3 +1,7 @@
+use std::{io::Cursor, process::Command};
+
+use image::{ImageBuffer, RgbaImage};
+use smithay_client_toolkit::output::OutputInfo;
 use wgpu::util::DeviceExt;
 use wgpu_text::section::{HorizontalAlign, Layout, OwnedSection, OwnedText, VerticalAlign};
 
@@ -372,17 +376,12 @@ impl Renderer {
 }
 
 impl MonSpecificRendering {
-    pub fn new(rect: &Rect<i32>, runtime_data: &RuntimeData) -> Self {
-        let background = runtime_data
-            .image
-            .crop_imm(
-                ((rect.x - runtime_data.area.x) as f32 / runtime_data.scale_factor) as u32,
-                ((rect.y - runtime_data.area.y) as f32 / runtime_data.scale_factor) as u32,
-                (rect.width as f32 / runtime_data.scale_factor) as u32,
-                (rect.height as f32 / runtime_data.scale_factor) as u32,
-            )
-            .to_rgba8();
-
+    pub fn new(
+        rect: &Rect<i32>,
+        info: &OutputInfo,
+        background: RgbaImage,
+        runtime_data: &RuntimeData,
+    ) -> Self {
         let bg_tex_size = wgpu::Extent3d {
             width: background.width(),
             height: background.height(),
@@ -467,15 +466,17 @@ impl MonSpecificRendering {
             mapped_at_creation: false,
         });
 
+        let ms_size = wgpu::Extent3d {
+            width: (rect.width * info.scale_factor) as u32,
+            height: (rect.height * info.scale_factor) as u32,
+            depth_or_array_layers: 1,
+        };
+
         let ms_tex = runtime_data
             .device
             .create_texture(&wgpu::TextureDescriptor {
                 label: None,
-                size: wgpu::Extent3d {
-                    width: rect.width as u32,
-                    height: rect.height as u32,
-                    depth_or_array_layers: 1,
-                },
+                size: ms_size,
                 mip_level_count: 1,
                 sample_count: runtime_data.config.msaa,
                 dimension: wgpu::TextureDimension::D2,
@@ -489,11 +490,7 @@ impl MonSpecificRendering {
             .device
             .create_texture(&wgpu::TextureDescriptor {
                 label: None,
-                size: wgpu::Extent3d {
-                    width: rect.width as u32,
-                    height: rect.height as u32,
-                    depth_or_array_layers: 1,
-                },
+                size: ms_size,
                 mip_level_count: 1,
                 sample_count: 1,
                 dimension: wgpu::TextureDimension::D2,
@@ -523,38 +520,36 @@ impl MonSpecificRendering {
                 ],
             });
 
-        let mut brush = wgpu_text::BrushBuilder::using_font(runtime_data.font.clone()).build(
+        let brush = wgpu_text::BrushBuilder::using_font(runtime_data.font.clone()).build(
             &runtime_data.device,
-            rect.width as u32,
-            rect.height as u32,
+            (rect.width * info.scale_factor) as u32,
+            (rect.height * info.scale_factor) as u32,
             wgpu::TextureFormat::Bgra8UnormSrgb,
         );
+        let pos = (
+            (rect.width * info.scale_factor) as f32 / 2.0,
+            (rect.height * info.scale_factor) as f32 / 2.0,
+        );
+        let layout = Layout::default()
+            .h_align(HorizontalAlign::Center)
+            .v_align(VerticalAlign::Center);
 
-        brush.resize_view(rect.width as f32, rect.height as f32, &runtime_data.queue);
         let rect_mode_section = OwnedSection::default()
             .add_text(
                 OwnedText::new("RECTANGLE MODE")
-                    .with_scale(runtime_data.config.mode_text_size as f32)
+                    .with_scale((runtime_data.config.mode_text_size * info.scale_factor) as f32)
                     .with_color(runtime_data.config.text_color),
             )
-            .with_layout(
-                Layout::default()
-                    .h_align(HorizontalAlign::Center)
-                    .v_align(VerticalAlign::Center),
-            )
-            .with_screen_position((rect.width as f32 / 2.0, rect.height as f32 / 2.0));
+            .with_layout(layout)
+            .with_screen_position(pos);
         let display_mode_section = OwnedSection::default()
             .add_text(
                 OwnedText::new("DISPLAY MODE")
-                    .with_scale(runtime_data.config.mode_text_size as f32)
+                    .with_scale((runtime_data.config.mode_text_size * info.scale_factor) as f32)
                     .with_color(runtime_data.config.text_color),
             )
-            .with_layout(
-                Layout::default()
-                    .h_align(HorizontalAlign::Center)
-                    .v_align(VerticalAlign::Center),
-            )
-            .with_screen_position((rect.width as f32 / 2.0, rect.height as f32 / 2.0));
+            .with_layout(layout)
+            .with_screen_position(pos);
 
         Self {
             bg_bind_group,
@@ -604,13 +599,16 @@ impl MonSpecificRendering {
                         let rect = rect.to_local(mon_rect);
 
                         let outer = rect
-                            .padded(config.line_width)
+                            .padded(config.line_width / 2)
+                            .to_render(mon_rect.width, mon_rect.height);
+                        let inner = rect
+                            .padded(-config.line_width / 2)
                             .to_render(mon_rect.width, mon_rect.height);
 
                         let rect = rect.to_render(mon_rect.width, mon_rect.height);
 
                         let (mut sel_vertices, mut sel_indices) =
-                            OverlayVertex::hollow_rect_vertices(&outer, &rect);
+                            OverlayVertex::hollow_rect_vertices(&outer, &inner);
                         let (shade_vertices, shade_indices) = OverlayVertex::hollow_rect_vertices(
                             &Rect::new(-1.0, 1.0, 2.0, 2.0),
                             &rect,
