@@ -1,6 +1,4 @@
-use std::{io::Cursor, process::Command};
-
-use image::{ImageBuffer, RgbaImage};
+use image::RgbaImage;
 use smithay_client_toolkit::output::OutputInfo;
 use wgpu::util::DeviceExt;
 use wgpu_text::section::{HorizontalAlign, Layout, OwnedSection, OwnedText, VerticalAlign};
@@ -28,6 +26,8 @@ pub const CIRCLE_EDGES: u32 = 64;
 // 8 circles per selection highlight
 // 24 indicies from the selection highlight rectangle
 const MAX_SEL_INDICES: u64 = CIRCLE_EDGES as u64 * 3 * 8 + 24;
+
+const OVERLAY_MSAA: u32 = 4;
 
 pub struct Renderer {
     // Pipelines
@@ -204,7 +204,7 @@ impl Renderer {
             },
             depth_stencil: None,
             multisample: wgpu::MultisampleState {
-                count: config.msaa,
+                count: OVERLAY_MSAA,
                 mask: !0,
                 alpha_to_coverage_enabled: false,
             },
@@ -478,7 +478,7 @@ impl MonSpecificRendering {
                 label: None,
                 size: ms_size,
                 mip_level_count: 1,
-                sample_count: runtime_data.config.msaa,
+                sample_count: OVERLAY_MSAA,
                 dimension: wgpu::TextureDimension::D2,
                 format: wgpu::TextureFormat::Bgra8UnormSrgb,
                 usage: wgpu::TextureUsages::RENDER_ATTACHMENT,

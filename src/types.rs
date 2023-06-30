@@ -60,7 +60,6 @@ pub struct Config {
     pub text_color: Color,
     pub mode_text_size: i32,
     pub font_family: String,
-    pub msaa: u32,
 }
 
 impl Config {
@@ -96,7 +95,6 @@ impl Default for Config {
             },
             mode_text_size: 30,
             font_family: "monospace".to_string(),
-            msaa: 4,
         }
     }
 }

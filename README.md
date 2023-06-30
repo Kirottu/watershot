@@ -4,7 +4,8 @@ A simple wayland native screenshot tool inspired by [Flameshot](https://flamesho
 
 ## Packages
 
-On an Arch based distro, you can simply install the AUR package [watershot-git](https://aur.archlinux.org/packages/watershot-git).
+On an Arch based distro, you can simply install the AUR package [watershot](https://aur.archlinux.org/packages/watershot),
+or [watershot-git](https://aur.archlinux.org/packages/watershot-git) for the latest git version.
 
 This project is a flake! If you have Nix, you know what to do.
 
@@ -82,8 +83,7 @@ Config(
         b: 1.0,
         a: 1.0,
     ),
-    size_text_size: 15,
-    mode_text_size: 30,
+    mode_text_size: 50,
     font_family: "monospace",
 )
 ```
