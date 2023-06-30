@@ -1,9 +1,4 @@
-use fontdue::{
-    layout::{CoordinateSystem, Layout, TextStyle},
-    Font,
-};
-
-use crate::types::{Color, Extents, Rect};
+use crate::types::{Extents, Rect};
 
 pub trait ToLocal<T> {
     fn to_local(&self, rect: &Rect<i32>) -> T;
@@ -13,8 +8,35 @@ pub trait ToGlobal<T> {
     fn to_global(&self, rect: &Rect<i32>) -> T;
 }
 
+pub trait ToRender<T, U> {
+    fn to_render(&self, width: U, height: U) -> T;
+}
+
 pub trait DistanceTo<T> {
     fn distance_to(&self, other: &(T, T)) -> T;
+}
+
+impl ToRender<Rect<f32>, i32> for Rect<i32> {
+    fn to_render(&self, width: i32, height: i32) -> Rect<f32> {
+        let width = width as f32;
+        let height = height as f32;
+
+        Rect {
+            x: (self.x as f32 / width - 0.5) * 2.0,
+            y: -(self.y as f32 / height - 0.5) * 2.0,
+            width: (self.width as f32 / width) * 2.0,
+            height: (self.height as f32 / height) * 2.0,
+        }
+    }
+}
+
+impl ToRender<[f32; 2], i32> for [f32; 2] {
+    fn to_render(&self, width: i32, height: i32) -> [f32; 2] {
+        [
+            (self[0] / width as f32 - 0.5) * 2.0,
+            -(self[1] / height as f32 - 0.5) * 2.0,
+        ]
+    }
 }
 
 impl ToLocal<Extents> for Extents {
@@ -31,6 +53,12 @@ impl ToLocal<Extents> for Extents {
 impl ToLocal<Rect<i32>> for Rect<i32> {
     fn to_local(&self, rect: &Rect<i32>) -> Rect<i32> {
         Rect::<i32>::new(self.x - rect.x, self.y - rect.y, self.width, self.height)
+    }
+}
+
+impl ToLocal<(i32, i32)> for (i32, i32) {
+    fn to_local(&self, rect: &Rect<i32>) -> (i32, i32) {
+        (self.0 - rect.x, self.1 - rect.y)
     }
 }
 

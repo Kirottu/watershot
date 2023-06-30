@@ -9,7 +9,7 @@ use crate::{
     handles,
     runtime_data::RuntimeData,
     traits::{DistanceTo, ToGlobal},
-    types::{DisplaySelection, Rect, RectangleSelection, Selection, SelectionModifier},
+    types::{DisplaySelection, RectangleSelection, Selection, SelectionModifier},
 };
 
 delegate_pointer!(RuntimeData);
@@ -41,8 +41,6 @@ impl PointerHandler for RuntimeData {
                 Motion { .. } => {
                     if let Selection::Rectangle(Some(selection)) = &mut self.selection {
                         if selection.active {
-                            let old = selection.extents;
-
                             match selection.modifier {
                                 // Handle selection modifiers, AKA the drag handles and moving it from the center
                                 Some(modifier) => match modifier {
@@ -89,35 +87,11 @@ impl PointerHandler for RuntimeData {
                                     selection.extents.end_y = global_pos.1;
                                 }
                             }
-
-                            let mut damage = old.to_rect().xor(&selection.extents.to_rect());
-                            damage.extend(handles!(&selection.extents).iter().map(|(x, y, _)| {
-                                Rect::new(
-                                    x - self.config.handle_radius,
-                                    y - self.config.handle_radius,
-                                    self.config.handle_radius * 2,
-                                    self.config.handle_radius * 2,
-                                )
-                            }));
-
-                            for monitor in &mut self.monitors {
-                                // Extra padding is added to make sure no artifacts remain on displays
-                                //monitor.damage.append(&mut damage.clone());
-                                monitor.damage.extend(
-                                    damage
-                                        .iter()
-                                        .filter_map(|rect| rect.constrain(&monitor.rect)),
-                                );
-                            }
                         }
                     }
                 }
                 Press { button, .. } => {
                     info!("Press {:x} @ {:?}", button, event.position);
-                    // Redraw all the monitor layers
-                    for monitor in &mut self.monitors {
-                        monitor.damage.push(monitor.rect);
-                    }
 
                     match &mut self.selection {
                         Selection::Rectangle(selection) => {

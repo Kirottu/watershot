@@ -29,10 +29,7 @@ mod sctk_impls {
     mod seat_handler;
     mod shm_handler;
 }
-mod rendering {
-    pub mod background;
-    pub mod shade;
-}
+mod rendering;
 
 fn main() {
     let args = Args::parse();

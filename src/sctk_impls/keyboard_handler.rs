@@ -50,16 +50,10 @@ impl KeyboardHandler for RuntimeData {
             // Exit without copying/saving
             keysyms::XKB_KEY_Escape => self.exit = ExitState::ExitOnly,
             // Switch selection mode
-            keysyms::XKB_KEY_Tab => {
-                for monitor in &mut self.monitors {
-                    monitor.damage.push(monitor.rect);
-                }
-
-                match &self.selection {
-                    Selection::Rectangle(_) => self.selection = Selection::Display(None),
-                    Selection::Display(_) => self.selection = Selection::Rectangle(None),
-                }
-            }
+            keysyms::XKB_KEY_Tab => match &self.selection {
+                Selection::Rectangle(_) => self.selection = Selection::Display(None),
+                Selection::Display(_) => self.selection = Selection::Rectangle(None),
+            },
             // Exit with save if a valid selection exists
             keysyms::XKB_KEY_Return => match &self.selection {
                 Selection::Rectangle(Some(selection)) => {

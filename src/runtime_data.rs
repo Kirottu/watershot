@@ -1,7 +1,6 @@
 use std::{fs, io::Cursor, process::Command};
 
 use fontconfig::Fontconfig;
-use fontdue::{Font, FontSettings};
 use image::DynamicImage;
 
 use smithay_client_toolkit::{
@@ -9,7 +8,7 @@ use smithay_client_toolkit::{
     output::OutputState,
     reexports::client::{
         globals::GlobalList,
-        protocol::{wl_keyboard, wl_pointer, wl_shm, wl_surface},
+        protocol::{wl_keyboard, wl_pointer, wl_surface},
         QueueHandle,
     },
     registry::RegistryState,
@@ -19,8 +18,7 @@ use smithay_client_toolkit::{
 };
 
 use crate::{
-    rendering::{background::Background, shade::Overlay},
-    traits::ToLocal,
+    rendering::Renderer,
     types::{Args, ExitState, MonitorIdentification},
     Config, Monitor, Rect, Selection,
 };
@@ -47,8 +45,7 @@ pub struct RuntimeData {
     pub selection: Selection,
     pub monitors: Vec<Monitor>,
     pub config: Config,
-    // Fontdue expects a list of fonts for layouts
-    pub font: Vec<Font>,
+    pub font: wgpu_text::font::FontArc,
     pub image: DynamicImage,
     pub exit: ExitState,
 
@@ -57,8 +54,7 @@ pub struct RuntimeData {
     pub adapter: wgpu::Adapter,
     pub queue: wgpu::Queue,
 
-    pub background: Background,
-    pub overlay: Overlay,
+    pub renderer: Renderer,
 }
 
 impl RuntimeData {
@@ -83,12 +79,6 @@ impl RuntimeData {
             .find(&config.font_family, None)
             .expect("Failed to find font");
 
-        let font = Font::from_bytes(
-            fs::read(fc_font.path).expect("Failed to load font data"),
-            FontSettings::default(),
-        )
-        .expect("Failed to load font");
-
         let compositor_state =
             CompositorState::bind(globals, qh).expect("wl_compositor is not available");
 
@@ -106,12 +96,17 @@ impl RuntimeData {
             }))
             .unwrap();
 
-        let (device, queue) =
-            pollster::block_on(adapter.request_device(&Default::default(), None)).unwrap();
+        let (device, queue) = pollster::block_on(adapter.request_device(
+            &wgpu::DeviceDescriptor {
+                label: None,
+                features: wgpu::Features::TEXTURE_ADAPTER_SPECIFIC_FORMAT_FEATURES,
+                ..Default::default()
+            },
+            None,
+        ))
+        .unwrap();
 
-        // Different rendering stages
-        let background = Background::new(&device);
-        let overlay = Overlay::new(&device, &config);
+        let renderer = Renderer::new(&device, &config);
 
         RuntimeData {
             registry_state: RegistryState::new(globals),
@@ -125,7 +120,6 @@ impl RuntimeData {
             area: Rect::default(),
             monitors: Vec::new(),
             image,
-            font: vec![font],
             keyboard: None,
             pointer: None,
             themed_pointer: None,
@@ -135,8 +129,11 @@ impl RuntimeData {
             adapter,
             device,
             queue,
-            background,
-            overlay,
+            renderer,
+            font: wgpu_text::font::FontArc::try_from_vec(
+                fs::read(fc_font.path).expect("Failed to load font"),
+            )
+            .expect("Invalid font data"),
         }
     }
 
@@ -154,7 +151,7 @@ impl RuntimeData {
                 .unwrap(),
         };
 
-        monitor.shade.update_vertices(
+        monitor.rendering.update_overlay_vertices(
             &monitor.rect,
             &monitor.wl_surface,
             &self.selection,
@@ -171,8 +168,14 @@ impl RuntimeData {
             .device
             .create_command_encoder(&wgpu::CommandEncoderDescriptor::default());
 
-        self.background.render(&mut encoder, &texture_view, monitor);
-        self.overlay.render(&mut encoder, &texture_view, monitor);
+        self.renderer.render(
+            &mut encoder,
+            &texture_view,
+            monitor,
+            &self.selection,
+            &self.device,
+            &self.queue,
+        );
 
         self.queue.submit(Some(encoder.finish()));
 

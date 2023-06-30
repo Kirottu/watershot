@@ -1,7 +1,6 @@
 use std::{env, fs};
 
 use clap::{Parser, Subcommand};
-use image::GenericImageView;
 use raw_window_handle::{
     HasRawDisplayHandle, HasRawWindowHandle, RawDisplayHandle, RawWindowHandle,
     WaylandDisplayHandle, WaylandWindowHandle,
@@ -10,17 +9,10 @@ use serde::Deserialize;
 use smithay_client_toolkit::{
     reexports::client::{protocol::wl_surface, Connection},
     shell::wlr_layer::LayerSurface,
-    shm::slot::{Buffer, SlotPool},
 };
 use wayland_client::Proxy;
 
-use crate::{
-    rendering::{
-        background::{Background, MonitorBackground},
-        shade::MonitorOverlay,
-    },
-    runtime_data::RuntimeData,
-};
+use crate::{rendering::MonSpecificRendering, runtime_data::RuntimeData};
 
 #[derive(Parser)]
 #[command(author, version, about)]
@@ -59,9 +51,9 @@ pub struct Config {
     pub selection_color: Color,
     pub shade_color: Color,
     pub text_color: Color,
-    pub size_text_size: i32,
     pub mode_text_size: i32,
     pub font_family: String,
+    pub msaa: u32,
 }
 
 impl Config {
@@ -95,9 +87,9 @@ impl Default for Config {
                 b: 0.8,
                 a: 1.0,
             },
-            size_text_size: 15,
             mode_text_size: 30,
             font_family: "monospace".to_string(),
+            msaa: 4,
         }
     }
 }
@@ -111,18 +103,19 @@ pub struct Color {
     pub a: f32,
 }
 
+impl From<Color> for wgpu_text::section::Color {
+    fn from(val: Color) -> Self {
+        [val.r, val.g, val.b, val.a]
+    }
+}
+
 /// Represents the layer and the monitor it resides on
 pub struct Monitor {
     pub layer: LayerSurface,
     pub wl_surface: wl_surface::WlSurface,
-    pub rect: Rect<i32>,
-    pub damage: Vec<Rect<i32>>,
-
-    // Wgpu stuff
     pub surface: wgpu::Surface,
-
-    pub shade: MonitorOverlay,
-    pub background: MonitorBackground,
+    pub rect: Rect<i32>,
+    pub rendering: MonSpecificRendering,
 }
 
 impl Monitor {
@@ -133,17 +126,13 @@ impl Monitor {
         rect: Rect<i32>,
         runtime_data: &RuntimeData,
     ) -> Self {
-        let background = MonitorBackground::new(&rect, runtime_data);
-        let shade = MonitorOverlay::new(runtime_data);
-
+        let rendering = MonSpecificRendering::new(&rect, runtime_data);
         Self {
             layer,
             wl_surface,
             rect,
-            damage: vec![rect],
             surface,
-            background,
-            shade,
+            rendering,
         }
     }
 }
@@ -206,24 +195,6 @@ impl<T> Rect<T> {
     }
 }
 
-impl Rect<f32> {
-    pub fn padded(self, amount: f32) -> Self {
-        let mut width = self.width + 2.0 * amount;
-        let mut height = self.height + 2.0 * amount;
-
-        // Make sure we have no negative size
-        if width < 0.0 {
-            width = 0.0;
-        }
-
-        if height < 0.0 {
-            height = 0.0;
-        }
-
-        Self::new(self.x - amount, self.y - amount, width, height)
-    }
-}
-
 impl Rect<i32> {
     pub fn contains(&self, x: i32, y: i32) -> bool {
         x >= self.x && x <= self.x + self.width && y >= self.y && y <= self.y + self.height
@@ -232,15 +203,6 @@ impl Rect<i32> {
     pub fn intersects(&self, other: &Self) -> bool {
         ((self.x + self.width).min(other.x + other.width) - self.x.max(other.x)) > 0
             && ((self.y + self.height).min(other.y + other.height) - self.y.max(other.y)) > 0
-    }
-
-    pub fn intersecting_rect(&self, other: &Self) -> Self {
-        let x = self.x.max(other.x);
-        let y = self.y.max(other.y);
-        let width = (self.x + self.width).min(other.x + other.width) - x;
-        let height = (self.y + self.height).min(other.y + other.height) - y;
-
-        Self::new(x, y, width, height)
     }
 
     pub fn to_extents(self) -> Extents {
@@ -282,67 +244,6 @@ impl Rect<i32> {
         Self::new(self.x - amount, self.y - amount, width, height)
     }
 
-    /// Return the split up rectangle, with the area provided missing
-    pub fn subtract(&self, subtract: &Self) -> Vec<Self> {
-        let mut result = Vec::new();
-
-        // Add the part of the Rect above the intersection
-        if self.y < subtract.y {
-            result.push(Rect {
-                x: self.x,
-                y: self.y,
-                width: self.width,
-                height: subtract.y - self.y,
-            });
-        }
-
-        // Add the part of the Rect below the subtraction
-        if self.y + self.height > subtract.y + subtract.height {
-            result.push(Rect {
-                x: self.x,
-                y: subtract.y + subtract.height,
-                width: self.width,
-                height: (self.y + self.height) - (subtract.y + subtract.height),
-            });
-        }
-
-        // Add the part of the Rect to the left of the subtraction
-        if self.x < subtract.x {
-            result.push(Rect {
-                x: self.x,
-                y: subtract.y,
-                width: subtract.x - self.x,
-                height: subtract.height,
-            });
-        }
-
-        // Add the part of the Rect to the right of the subtraction
-        if self.x + self.width > subtract.x + subtract.width {
-            result.push(Rect {
-                x: subtract.x + subtract.width,
-                y: subtract.y,
-                width: (self.x + self.width) - (subtract.x + subtract.width),
-                height: subtract.height,
-            });
-        }
-
-        result
-    }
-
-    pub fn xor(&self, other: &Self) -> Vec<Self> {
-        // If there is no intersection, the damaged area is both rects
-        if !self.intersects(other) {
-            return vec![*self, *other];
-        }
-
-        let intersection = self.intersecting_rect(other);
-
-        let mut results = Vec::new();
-        results.append(&mut self.subtract(&intersection));
-        results.append(&mut other.subtract(&intersection));
-        results
-    }
-
     /// Constrain the rectangle to fit inside the provided rectangle
     pub fn constrain(&self, area: &Self) -> Option<Self> {
         if !self.intersects(area) {
@@ -357,15 +258,6 @@ impl Rect<i32> {
             res.height = (self.y + self.height - res.y).clamp(0, area.height);
 
             Some(res)
-        }
-    }
-
-    pub fn to_render_space(self, width: f32, height: f32) -> Rect<f32> {
-        Rect {
-            x: (self.x as f32 / width - 0.5) * 2.0,
-            y: -(self.y as f32 / height - 0.5) * 2.0,
-            width: (self.width as f32 / width) * 2.0,
-            height: (self.height as f32 / height) * 2.0,
         }
     }
 }
@@ -465,38 +357,5 @@ unsafe impl HasRawWindowHandle for RawWgpuHandles {
 unsafe impl HasRawDisplayHandle for RawWgpuHandles {
     fn raw_display_handle(&self) -> RawDisplayHandle {
         self.display
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_intersection_rect() {
-        assert_eq!(
-            Rect::intersecting_rect(&Rect::new(0, 0, 10, 10), &Rect::new(5, 5, 10, 10),),
-            Rect::new(5, 5, 5, 5),
-        );
-        assert_eq!(
-            Rect::intersecting_rect(&Rect::new(0, 0, 10, 10), &Rect::new(-5, -5, 10, 10),),
-            Rect::new(0, 0, 5, 5),
-        );
-    }
-
-    #[test]
-    fn test_xor() {
-        let damage = Rect::new(0, 0, 10, 10).xor(&Rect::new(0, 0, 8, 8));
-
-        for x in 0..15 {
-            for y in 0..15 {
-                if damage.iter().any(|rect| rect.contains(x, y)) {
-                    print!("#");
-                } else {
-                    print!(".");
-                }
-            }
-            println!();
-        }
     }
 }

@@ -14,7 +14,6 @@ image = { version = "0.24.5", features = ["webp-encoder"] }
 ron = "0.8.0"
 serde = { version = "1.0.152", features = ["derive"] }
 fontconfig = "0.6.0"
-fontdue = "0.7.2"
 wl-clipboard-rs = "0.7.0"
 nix = { version = "0.26.1", default-features = false, features = ["process"] }
 clap = { version = "4.0.32", features = ["derive"] }
@@ -25,3 +24,4 @@ wgpu = "0.16.1"
 raw-window-handle = "0.5.2"
 pollster = "0.3.0"
 bytemuck = { version = "1.13.1", features = ["derive"] }
+wgpu_text = "0.8.1"
