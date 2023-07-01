@@ -14,18 +14,30 @@ in {
       "Cargo.toml"
       "Cargo.lock"
       "src"
+      "res"
     ];
 
     cargoLock.lockFile = self + "/Cargo.lock";
 
     nativeBuildInputs = with nixpkgs; [
       pkg-config
+      makeWrapper
     ];
 
     buildInputs = with nixpkgs; [
       fontconfig
       libxkbcommon
       wayland
+      vulkan-loader
+      libGL
     ];
+
+    postFixup = ''
+      patchelf --add-rpath ${nixpkgs.vulkan-loader}/lib $out/bin/watershot
+      patchelf --add-rpath ${nixpkgs.libGL}/lib $out/bin/watershot
+
+      wrapProgram $out/bin/watershot \
+        --add-flags "-g \"${nixpkgs.grim}/bin/grim\""
+    '';
   };
 }
