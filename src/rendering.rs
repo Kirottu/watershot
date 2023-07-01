@@ -6,7 +6,7 @@ use wgpu_text::section::{HorizontalAlign, Layout, OwnedSection, OwnedText, Verti
 use crate::{
     handles,
     runtime_data::RuntimeData,
-    traits::{ToLocal, ToRender},
+    traits::{Padded, ToLocal, ToRender},
     types::{Config, Monitor, Rect, Selection},
 };
 
@@ -599,10 +599,10 @@ impl MonSpecificRendering {
                         let rect = rect.to_local(mon_rect);
 
                         let outer = rect
-                            .padded(config.line_width / 2)
+                            .padded(config.line_width as f32 / 2.0)
                             .to_render(mon_rect.width, mon_rect.height);
                         let inner = rect
-                            .padded(-config.line_width / 2)
+                            .padded(-config.line_width as f32 / 2.0)
                             .to_render(mon_rect.width, mon_rect.height);
 
                         let rect = rect.to_render(mon_rect.width, mon_rect.height);

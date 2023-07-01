@@ -20,17 +20,35 @@ pub trait Contains<T> {
     fn contains(&self, item: &T) -> bool;
 }
 
+pub trait Padded<T> {
+    fn padded(&self, amount: T) -> Rect<T>;
+}
+
 impl ToRender<Rect<f32>, i32> for Rect<i32> {
     fn to_render(&self, width: i32, height: i32) -> Rect<f32> {
         let width = width as f32;
         let height = height as f32;
 
-        Rect {
-            x: (self.x as f32 / width - 0.5) * 2.0,
-            y: -(self.y as f32 / height - 0.5) * 2.0,
-            width: (self.width as f32 / width) * 2.0,
-            height: (self.height as f32 / height) * 2.0,
-        }
+        Rect::new(
+            (self.x as f32 / width - 0.5) * 2.0,
+            -(self.y as f32 / height - 0.5) * 2.0,
+            (self.width as f32 / width) * 2.0,
+            (self.height as f32 / height) * 2.0,
+        )
+    }
+}
+
+impl ToRender<Rect<f32>, i32> for Rect<f32> {
+    fn to_render(&self, width: i32, height: i32) -> Rect<f32> {
+        let width = width as f32;
+        let height = height as f32;
+
+        Rect::new(
+            (self.x / width - 0.5) * 2.0,
+            -(self.y / height - 0.5) * 2.0,
+            (self.width / width) * 2.0,
+            (self.height / height) * 2.0,
+        )
     }
 }
 
@@ -95,5 +113,45 @@ impl Contains<Rect<i32>> for Rect<i32> {
             && self.y <= other.y
             && self.x + self.width >= other.x + other.width
             && self.y + self.height >= other.y + other.height
+    }
+}
+
+impl Padded<f32> for Rect<i32> {
+    fn padded(&self, amount: f32) -> Rect<f32> {
+        let mut width = self.width as f32 + 2.0 * amount;
+        let mut height = self.height as f32 + 2.0 * amount;
+
+        // Make sure we have no negative size
+        if width < 0.0 {
+            width = 0.0;
+        }
+
+        if height < 0.0 {
+            height = 0.0;
+        }
+
+        Rect::new(
+            self.x as f32 - amount,
+            self.y as f32 - amount,
+            width,
+            height,
+        )
+    }
+}
+impl Padded<i32> for Rect<i32> {
+    fn padded(&self, amount: i32) -> Rect<i32> {
+        let mut width = self.width + 2 * amount;
+        let mut height = self.height + 2 * amount;
+
+        // Make sure we have no negative size
+        if width < 0 {
+            width = 0;
+        }
+
+        if height < 0 {
+            height = 0;
+        }
+
+        Rect::new(self.x - amount, self.y - amount, width, height)
     }
 }

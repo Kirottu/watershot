@@ -280,22 +280,6 @@ impl Rect<i32> {
         *self = Self::new(x, y, width, height);
     }
 
-    pub fn padded(self, amount: i32) -> Self {
-        let mut width = self.width + 2 * amount;
-        let mut height = self.height + 2 * amount;
-
-        // Make sure we have no negative size
-        if width < 0 {
-            width = 0;
-        }
-
-        if height < 0 {
-            height = 0;
-        }
-
-        Self::new(self.x - amount, self.y - amount, width, height)
-    }
-
     /// Constrain the rectangle to fit inside the provided rectangle
     pub fn constrain(&self, area: &Self) -> Option<Self> {
         if !self.intersects(area) {
