@@ -18,7 +18,7 @@ wl-clipboard-rs = "0.7.0"
 nix = { version = "0.26.1", default-features = false, features = ["process"] }
 clap = { version = "4.0.32", features = ["derive"] }
 chrono = "0.4.23"
-env_logger = "0.10.0"
+env_logger = { version = "0.10.0", default-features = false, features = ["auto-color"] }
 log = "0.4.17"
 wgpu = "0.16.1"
 raw-window-handle = "0.5.2"
