@@ -40,12 +40,12 @@ impl LayerShellHandler for RuntimeData {
             &self.device,
             &wgpu::SurfaceConfiguration {
                 usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
-                format: cap.formats[0],
+                format: wgpu::TextureFormat::Bgra8UnormSrgb,
                 width: (monitor.rect.width * monitor.scale_factor) as u32,
                 height: (monitor.rect.height * monitor.scale_factor) as u32,
                 present_mode: wgpu::PresentMode::Mailbox,
                 alpha_mode: wgpu::CompositeAlphaMode::Opaque,
-                view_formats: vec![cap.formats[0]],
+                view_formats: vec![wgpu::TextureFormat::Bgra8UnormSrgb],
             },
         );
 
