@@ -25,3 +25,4 @@ raw-window-handle = "0.5.2"
 pollster = "0.3.0"
 bytemuck = { version = "1.13.1", features = ["derive"] }
 wgpu_text = "0.8.1"
+regex = "1.9.1"
