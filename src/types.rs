@@ -20,12 +20,12 @@ use wayland_client::{
 };
 
 use crate::{
-    errors::{NotSlurpStyleError, NotXRectSelStyleError, UnparseableRectError},
+    errors::{NotSlurpStyleError, NotXRectSelStyleError},
     rendering::MonSpecificRendering,
     runtime_data::RuntimeData,
 };
 
-#[derive(Parser, Clone)]
+#[derive(Parser, Clone, Debug)]
 #[command(author, version, about)]
 pub struct Args {
     /// Copy the screenshot after exit
@@ -43,9 +43,13 @@ pub struct Args {
     /// Save the image into a file
     #[command(subcommand)]
     pub save: Option<SaveLocation>,
+
+    /// Optional selection to start with
+    #[arg(long)]
+    pub initial_selection: Option<Rect<i32>>,
 }
 
-#[derive(Subcommand, Clone)]
+#[derive(Subcommand, Clone, Debug)]
 pub enum SaveLocation {
     /// The path to save the image to
     Path { path: String },

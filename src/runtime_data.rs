@@ -19,7 +19,7 @@ use smithay_client_toolkit::{
 
 use crate::{
     rendering::Renderer,
-    types::{Args, ExitState, MonitorIdentification},
+    types::{Args, ExitState, MonitorIdentification, RectangleSelection},
     Config, Monitor, Rect, Selection,
 };
 
@@ -111,6 +111,18 @@ impl RuntimeData {
 
         let renderer = Renderer::new(&device, &config);
 
+        let selection: Selection = if let Some(rect) = args.initial_selection {
+            Selection::Rectangle(Some(
+                RectangleSelection {
+                    extents: rect.to_extents(),
+                    modifier: None,
+                    active: false,
+                }
+            ))
+        } else {
+            Selection::Rectangle(None)
+        };
+
         RuntimeData {
             registry_state: RegistryState::new(globals),
             seat_state: SeatState::new(globals, qh),
@@ -118,7 +130,7 @@ impl RuntimeData {
             compositor_state,
             layer_state: LayerShell::bind(globals, qh).expect("layer shell is not available"),
             shm_state: Shm::bind(globals, qh).expect("wl_shm is not available"),
-            selection: Selection::Rectangle(None),
+            selection,
             config,
             area: Rect::default(),
             monitors: Vec::new(),
