@@ -338,12 +338,12 @@ impl Rect<i32> {
 }
 
 impl FromStr for Rect<i32> {
-    type Err = UnparseableRectError;
+    type Err = String;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         Self::from_slurp_style(s)
             .or(Self::from_xrectsel_style(s))
-            .map_err(|_| UnparseableRectError)
+            .map_err(|_| "Impossible to parse rectangle".to_string())
     }
 }
 
