@@ -47,6 +47,11 @@ pub struct Args {
     /// Optional selection to start with
     #[arg(long)]
     pub initial_selection: Option<Rect<i32>>,
+
+    /// Whether the program should just capture whatever's under
+    /// `initial_selection` or run interactively
+    #[arg(long, default_value_t = false)]
+    pub auto_capture: bool,
 }
 
 #[derive(Subcommand, Clone, Debug)]

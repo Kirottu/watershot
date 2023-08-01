@@ -112,15 +112,21 @@ impl RuntimeData {
         let renderer = Renderer::new(&device, &config);
 
         let selection: Selection = if let Some(rect) = args.initial_selection {
-            Selection::Rectangle(Some(
-                RectangleSelection {
-                    extents: rect.to_extents(),
-                    modifier: None,
-                    active: false,
-                }
-            ))
+            Selection::Rectangle(Some(RectangleSelection {
+                extents: rect.to_extents(),
+                modifier: None,
+                active: false,
+            }))
         } else {
             Selection::Rectangle(None)
+        };
+
+        let exit: ExitState = if !args.auto_capture {
+            ExitState::None
+        } else if let Some(rect) = args.initial_selection {
+            ExitState::ExitWithSelection(rect)
+        } else {
+            ExitState::ExitOnly
         };
 
         RuntimeData {
@@ -140,7 +146,7 @@ impl RuntimeData {
             keyboard: None,
             pointer: None,
             themed_pointer: None,
-            exit: ExitState::None,
+            exit,
             args,
             pointer_surface,
             instance,
