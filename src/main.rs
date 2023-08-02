@@ -14,6 +14,10 @@ mod macros;
 mod runtime_data;
 mod traits;
 mod types;
+
+#[cfg(feature = "window-selection")]
+pub mod window;
+
 mod sctk_impls {
     mod compositor_handler;
     mod keyboard_handler;

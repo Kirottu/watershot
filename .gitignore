@@ -3,3 +3,6 @@ result
 
 # nixago: ignore-linked-files
 /treefmt.toml
+
+# VS Code user settings
+/.vscode/settings.json

@@ -12,6 +12,9 @@ use crate::{
     types::{DisplaySelection, RectangleSelection, Selection, SelectionModifier},
 };
 
+#[cfg(feature = "window-selection")]
+use crate::window::DescribesWindow;
+
 delegate_pointer!(RuntimeData);
 
 impl PointerHandler for RuntimeData {
@@ -125,6 +128,20 @@ impl PointerHandler for RuntimeData {
                             self.selection = Selection::Display(Some(DisplaySelection::new(
                                 event.surface.clone(),
                             )));
+                        }
+                        #[cfg(feature = "window-selection")]
+                        Selection::Window(_) => {
+                            info!("Checking point {global_pos:?}");
+                            self.selection = Selection::Window(
+                                self.windows
+                                    .iter()
+                                    .find(|window| {
+                                        window
+                                            .get_window_rect()
+                                            .contains_point(global_pos.0, global_pos.1)
+                                    })
+                                    .cloned(),
+                            );
                         }
                     }
                 }

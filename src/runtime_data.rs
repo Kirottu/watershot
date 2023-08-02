@@ -19,9 +19,12 @@ use smithay_client_toolkit::{
 
 use crate::{
     rendering::Renderer,
-    types::{Args, ExitState, MonitorIdentification, RectangleSelection},
+    types::{Args, ExitState, MonitorIdentification},
     Config, Monitor, Rect, Selection,
 };
+
+#[cfg(feature = "window-selection")]
+use crate::window::{DescribesWindow, WindowDescriptor};
 
 /// The main data worked on at runtime
 pub struct RuntimeData {
@@ -58,6 +61,9 @@ pub struct RuntimeData {
     pub queue: wgpu::Queue,
 
     pub renderer: Renderer,
+
+    #[cfg(feature = "window-selection")]
+    pub windows: Vec<WindowDescriptor>,
 }
 
 impl RuntimeData {
@@ -140,6 +146,8 @@ impl RuntimeData {
                 fs::read(fc_font.path).expect("Failed to load font"),
             )
             .expect("Invalid font data"),
+            #[cfg(feature = "window-selection")]
+            windows: WindowDescriptor::get_all_windows(),
         }
     }
 

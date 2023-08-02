@@ -1,4 +1,4 @@
-use std::{env, fs, io::Cursor, process::Command, str::FromStr};
+use std::{env, fs, io::Cursor, process::Command};
 
 use clap::{Parser, Subcommand};
 use image::DynamicImage;
@@ -19,11 +19,10 @@ use wayland_client::{
     Connection, Proxy, QueueHandle,
 };
 
-use crate::{
-    errors::{NotSlurpStyleError, NotXRectSelStyleError},
-    rendering::MonSpecificRendering,
-    runtime_data::RuntimeData,
-};
+use crate::{rendering::MonSpecificRendering, runtime_data::RuntimeData};
+
+#[cfg(feature = "window-selection")]
+use crate::window::{DescribesWindow, WindowDescriptor};
 
 #[derive(Parser, Clone, Debug)]
 #[command(author, version, about)]
@@ -301,15 +300,8 @@ impl Rect<i32> {
         }
     }
 
-}
-
-impl FromStr for Rect<i32> {
-    type Err = String;
-
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        Self::from_slurp_style(s)
-            .or(Self::from_xrectsel_style(s))
-            .map_err(|_| "Impossible to parse rectangle".to_string())
+    pub fn contains_point(&self, x: i32, y: i32) -> bool {
+        x >= self.x && x <= self.x + self.width && y >= self.y && y <= self.y + self.height
     }
 }
 
@@ -327,17 +319,38 @@ pub enum SelectionModifier {
     Center(i32, i32, Extents),
 }
 
+#[derive(Debug, Clone)]
 pub enum Selection {
     Rectangle(Option<RectangleSelection>),
     Display(Option<DisplaySelection>),
+    #[cfg(feature = "window-selection")]
+    Window(Option<WindowDescriptor>),
 }
 
+impl Selection {
+    pub fn flattened(&self) -> Selection {
+        match self {
+            #[cfg(feature = "window-selection")]
+            Self::Window(Some(window)) => Self::Rectangle(Some(RectangleSelection {
+                extents: window.get_window_rect().to_extents(),
+                modifier: None,
+                active: false,
+            })),
+            #[cfg(feature = "window-selection")]
+            Self::Window(None) => Self::Rectangle(None),
+            _ => self.clone(),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy)]
 pub struct RectangleSelection {
     pub extents: Extents,
     pub modifier: Option<SelectionModifier>,
     pub active: bool,
 }
 
+#[derive(Debug, Clone)]
 pub struct DisplaySelection {
     pub wl_surface: wl_surface::WlSurface,
 }
