@@ -13,7 +13,7 @@ use crate::{
 };
 
 #[cfg(feature = "window-selection")]
-use crate::window::DescribesWindow;
+use crate::window::FindWindow;
 
 delegate_pointer!(RuntimeData);
 
@@ -131,15 +131,9 @@ impl PointerHandler for RuntimeData {
                         }
                         #[cfg(feature = "window-selection")]
                         Selection::Window(_) => {
-                            info!("Checking point {global_pos:?}");
                             self.selection = Selection::Window(
                                 self.windows
-                                    .iter()
-                                    .find(|window| {
-                                        window
-                                            .get_window_rect()
-                                            .contains_point(global_pos.0, global_pos.1)
-                                    })
+                                    .find_by_position(global_pos.0, global_pos.1)
                                     .cloned(),
                             );
                         }

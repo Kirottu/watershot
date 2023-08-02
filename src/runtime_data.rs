@@ -24,7 +24,7 @@ use crate::{
 };
 
 #[cfg(feature = "window-selection")]
-use crate::window::{DescribesWindow, WindowDescriptor};
+use crate::window::{DescribesWindow, FindWindow, GetsMouse, MouseGetter, WindowDescriptor};
 
 /// The main data worked on at runtime
 pub struct RuntimeData {
@@ -67,7 +67,7 @@ pub struct RuntimeData {
 }
 
 impl RuntimeData {
-    pub fn new(qh: &QueueHandle<Self>, globals: &GlobalList, args: Args) -> Self {
+    pub fn new(qh: &QueueHandle<Self>, globals: &GlobalList, mut args: Args) -> Self {
         let output = Command::new(args.grim.as_ref().unwrap_or(&"grim".to_string()))
             .arg("-t")
             .arg("ppm")
@@ -117,6 +117,27 @@ impl RuntimeData {
 
         let renderer = Renderer::new(&device, &config);
 
+        #[cfg(feature = "window-selection")]
+        let (selection, windows) = {
+            let windows = WindowDescriptor::get_all_windows();
+
+            let selection = match (args.window_search.take(), args.window_under_cursor, args.active_window) {
+                (None, true, false) => {
+                    let (mouse_x, mouse_y) = MouseGetter::get_mouse_position();
+                    Selection::from_window(windows.find_by_position(mouse_x, mouse_y).cloned())
+                },
+                (Some(search_param), false, false) => Selection::from_window(windows.find_by_search_param(search_param).cloned()),
+                (None, false, true) => Selection::from_window(WindowDescriptor::get_focused()),
+                (None, false, false) => Selection::Rectangle(None),
+                (Some(_), true, true) | (Some(_), true, false) | (Some(_), false, true) | (None, true, true) => unreachable!("All args belong to the same clap group and, therefore, there should never be two of them active at the same time"),
+            };
+
+            (selection, windows)
+        };
+
+        #[cfg(not(feature = "window-selection"))]
+        let selection = Selection::Rectangle(None);
+
         RuntimeData {
             registry_state: RegistryState::new(globals),
             seat_state: SeatState::new(globals, qh),
@@ -124,7 +145,7 @@ impl RuntimeData {
             compositor_state,
             layer_state: LayerShell::bind(globals, qh).expect("layer shell is not available"),
             shm_state: Shm::bind(globals, qh).expect("wl_shm is not available"),
-            selection: Selection::Rectangle(None),
+            selection,
             config,
             area: Rect::default(),
             monitors: Vec::new(),
@@ -147,7 +168,7 @@ impl RuntimeData {
             )
             .expect("Invalid font data"),
             #[cfg(feature = "window-selection")]
-            windows: WindowDescriptor::get_all_windows(),
+            windows,
         }
     }
 

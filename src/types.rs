@@ -22,7 +22,7 @@ use wayland_client::{
 use crate::{rendering::MonSpecificRendering, runtime_data::RuntimeData};
 
 #[cfg(feature = "window-selection")]
-use crate::window::{DescribesWindow, WindowDescriptor};
+use crate::window::{search::WindowSearchParam, DescribesWindow, WindowDescriptor};
 
 #[derive(Parser, Clone, Debug)]
 #[command(author, version, about)]
@@ -42,6 +42,18 @@ pub struct Args {
     /// Save the image into a file
     #[command(subcommand)]
     pub save: Option<SaveLocation>,
+
+    #[cfg(feature = "window-selection")]
+    #[arg(long, group = "capture-window")]
+    pub window_search: Option<WindowSearchParam>,
+
+    #[cfg(feature = "window-selection")]
+    #[arg(long, group = "capture-window")]
+    pub window_under_cursor: bool,
+
+    #[cfg(feature = "window-selection")]
+    #[arg(long, group = "capture-window")]
+    pub active_window: bool,
 }
 
 #[derive(Subcommand, Clone, Debug)]
@@ -339,6 +351,14 @@ impl Selection {
             #[cfg(feature = "window-selection")]
             Self::Window(None) => Self::Rectangle(None),
             _ => self.clone(),
+        }
+    }
+
+    #[cfg(feature = "window-selection")]
+    pub fn from_window(window: Option<WindowDescriptor>) -> Self {
+        match window {
+            Some(window) => Self::Window(Some(window)),
+            None => Self::Rectangle(None),
         }
     }
 }
