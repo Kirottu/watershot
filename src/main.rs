@@ -10,7 +10,6 @@ use traits::{Contains, ToLocal};
 use types::{Args, Config, ExitState, Monitor, Rect, SaveLocation, Selection};
 use wl_clipboard_rs::copy;
 
-mod errors;
 mod macros;
 mod runtime_data;
 mod traits;
