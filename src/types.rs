@@ -54,6 +54,10 @@ pub struct Args {
     #[cfg(feature = "window-selection")]
     #[arg(long, group = "capture-window")]
     pub active_window: bool,
+
+    #[cfg(feature = "window-selection")]
+    #[arg(long)]
+    pub auto_capture: bool,
 }
 
 #[derive(Subcommand, Clone, Debug)]

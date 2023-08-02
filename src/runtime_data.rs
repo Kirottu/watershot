@@ -118,7 +118,7 @@ impl RuntimeData {
         let renderer = Renderer::new(&device, &config);
 
         #[cfg(feature = "window-selection")]
-        let (selection, windows) = {
+        let (selection, windows, exit) = {
             let windows = WindowDescriptor::get_all_windows();
 
             let selection = match (args.window_search.take(), args.window_under_cursor, args.active_window) {
@@ -132,11 +132,22 @@ impl RuntimeData {
                 (Some(_), true, true) | (Some(_), true, false) | (Some(_), false, true) | (None, true, true) => unreachable!("All args belong to the same clap group and, therefore, there should never be two of them active at the same time"),
             };
 
-            (selection, windows)
+            if !args.auto_capture {
+                (selection, windows, ExitState::None)
+            } else if let Selection::Rectangle(Some(rect_sel)) = selection.flattened() {
+                (
+                    selection,
+                    windows,
+                    ExitState::ExitWithSelection(rect_sel.extents.to_rect()),
+                )
+            } else {
+                // TODO: Auto-capture for monitors
+                (selection, windows, ExitState::None)
+            }
         };
 
         #[cfg(not(feature = "window-selection"))]
-        let selection = Selection::Rectangle(None);
+        let (selection, exit) = (Selection::Rectangle(None), ExitState::None);
 
         RuntimeData {
             registry_state: RegistryState::new(globals),
@@ -155,7 +166,7 @@ impl RuntimeData {
             keyboard: None,
             pointer: None,
             themed_pointer: None,
-            exit: ExitState::None,
+            exit,
             args,
             pointer_surface,
             instance,
