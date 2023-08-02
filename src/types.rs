@@ -43,18 +43,24 @@ pub struct Args {
     #[command(subcommand)]
     pub save: Option<SaveLocation>,
 
+    /// Pre-selects a window by its class, title or initial versions of the two.
+    /// The value passed can be a regex.
+    /// Examples: "class=Alacritty" , "title=.*Visual Studio Code.*"
     #[cfg(feature = "window-selection")]
     #[arg(long, group = "capture-window")]
     pub window_search: Option<WindowSearchParam>,
 
+    /// Pre-selects the window under the mouse cursor.
     #[cfg(feature = "window-selection")]
     #[arg(long, group = "capture-window")]
     pub window_under_cursor: bool,
 
+    /// Pre-selects the currently-focused window.
     #[cfg(feature = "window-selection")]
     #[arg(long, group = "capture-window")]
     pub active_window: bool,
 
+    /// Automatically captures the pre-selected window, skipping interactive mode.
     #[cfg(feature = "window-selection")]
     #[arg(long)]
     pub auto_capture: bool,
