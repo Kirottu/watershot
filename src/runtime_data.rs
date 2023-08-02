@@ -111,24 +111,6 @@ impl RuntimeData {
 
         let renderer = Renderer::new(&device, &config);
 
-        let selection: Selection = if let Some(rect) = args.initial_selection {
-            Selection::Rectangle(Some(RectangleSelection {
-                extents: rect.to_extents(),
-                modifier: None,
-                active: false,
-            }))
-        } else {
-            Selection::Rectangle(None)
-        };
-
-        let exit: ExitState = if !args.auto_capture {
-            ExitState::None
-        } else if let Some(rect) = args.initial_selection {
-            ExitState::ExitWithSelection(rect)
-        } else {
-            ExitState::ExitOnly
-        };
-
         RuntimeData {
             registry_state: RegistryState::new(globals),
             seat_state: SeatState::new(globals, qh),
@@ -136,7 +118,7 @@ impl RuntimeData {
             compositor_state,
             layer_state: LayerShell::bind(globals, qh).expect("layer shell is not available"),
             shm_state: Shm::bind(globals, qh).expect("wl_shm is not available"),
-            selection,
+            selection: Selection::Rectangle(None),
             config,
             area: Rect::default(),
             monitors: Vec::new(),
@@ -146,7 +128,7 @@ impl RuntimeData {
             keyboard: None,
             pointer: None,
             themed_pointer: None,
-            exit,
+            exit: ExitState::None,
             args,
             pointer_surface,
             instance,
