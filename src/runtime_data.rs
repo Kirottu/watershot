@@ -50,7 +50,7 @@ pub struct RuntimeData {
     pub selection: Selection,
     pub monitors: Vec<Monitor>,
     pub config: Config,
-    pub font: wgpu_text::font::FontArc,
+    pub font: wgpu_text::glyph_brush::ab_glyph::FontArc,
     pub image: DynamicImage,
     pub exit: ExitState,
     pub args: Args,
@@ -142,7 +142,7 @@ impl RuntimeData {
             device,
             queue,
             renderer,
-            font: wgpu_text::font::FontArc::try_from_vec(
+            font: wgpu_text::glyph_brush::ab_glyph::FontArc::try_from_vec(
                 fs::read(fc_font.path).expect("Failed to load font"),
             )
             .expect("Invalid font data"),

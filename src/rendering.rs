@@ -1,7 +1,7 @@
 use image::RgbaImage;
 use smithay_client_toolkit::output::OutputInfo;
 use wgpu::util::DeviceExt;
-use wgpu_text::section::{HorizontalAlign, Layout, OwnedSection, OwnedText, VerticalAlign};
+use wgpu_text::glyph_brush::{HorizontalAlign, Layout, OwnedSection, OwnedText, VerticalAlign};
 
 use crate::{
     handles,
@@ -61,7 +61,7 @@ pub struct MonSpecificRendering {
     /// Bind group for the resolve target texture
     ms_bind_group: wgpu::BindGroup,
 
-    pub brush: wgpu_text::TextBrush<wgpu_text::font::FontArc>,
+    pub brush: wgpu_text::TextBrush<wgpu_text::glyph_brush::ab_glyph::FontArc>,
     rect_mode_section: OwnedSection,
     display_mode_section: OwnedSection,
     #[cfg(feature = "window-selection")]

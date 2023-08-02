@@ -111,7 +111,7 @@ pub struct Color {
     pub a: f32,
 }
 
-impl From<Color> for wgpu_text::section::Color {
+impl From<Color> for wgpu_text::glyph_brush::Color {
     fn from(val: Color) -> Self {
         [val.r, val.g, val.b, val.a]
     }
