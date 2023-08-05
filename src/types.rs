@@ -424,6 +424,11 @@ pub struct RawWgpuHandles {
     display: RawDisplayHandle,
 }
 
+pub enum HandlesState {
+    Changed,
+    Unchanged,
+}
+
 impl RawWgpuHandles {
     pub fn new(conn: &Connection, surface: &wl_surface::WlSurface) -> Self {
         let mut display_handle = WaylandDisplayHandle::empty();

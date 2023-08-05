@@ -18,8 +18,12 @@ use smithay_client_toolkit::{
 };
 
 use crate::{
+    handles,
     rendering::Renderer,
-    types::{Args, ExitState, MonitorIdentification},
+    traits::{Contains, DistanceTo},
+    types::{
+        Args, ExitState, HandlesState, MonitorIdentification, RectangleSelection, SelectionModifier,
+    },
     window::{hyprland::HyprlandBackend, CompositorBackend, FindWindowExt, InitializeBackend},
     Config, Monitor, Rect, Selection,
 };
@@ -239,5 +243,32 @@ impl RuntimeData {
         monitor.wl_surface.frame(qh, monitor.wl_surface.clone());
         surface_texture.present();
         monitor.wl_surface.commit();
+    }
+
+    pub fn process_selection_handles(
+        rect_sel: &mut Option<RectangleSelection>,
+        global_pos: (i32, i32),
+        handle_radius: i32,
+    ) -> HandlesState {
+        if let Some(selection) = rect_sel {
+            for (x, y, modifier) in handles!(selection.extents) {
+                if global_pos.distance_to(&(*x, *y)) <= handle_radius {
+                    selection.modifier = Some(*modifier);
+                    selection.active = true;
+                    return HandlesState::Changed;
+                }
+            }
+            if selection.extents.to_rect().contains(&global_pos) {
+                selection.modifier = Some(SelectionModifier::Center(
+                    global_pos.0,
+                    global_pos.1,
+                    selection.extents,
+                ));
+                selection.active = true;
+                return HandlesState::Changed;
+            }
+        }
+
+        HandlesState::Unchanged
     }
 }

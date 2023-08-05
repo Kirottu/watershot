@@ -6,10 +6,9 @@ use smithay_client_toolkit::{
 };
 
 use crate::{
-    handles,
     runtime_data::RuntimeData,
-    traits::{Contains, DistanceTo, ToGlobal},
-    types::{DisplaySelection, RectangleSelection, Selection, SelectionModifier},
+    traits::ToGlobal,
+    types::{DisplaySelection, HandlesState, RectangleSelection, Selection, SelectionModifier},
     window::FindWindowExt,
 };
 
@@ -95,32 +94,17 @@ impl PointerHandler for RuntimeData {
                     info!("Press {:x} @ {:?}", button, event.position);
 
                     match &mut self.selection {
-                        Selection::Rectangle(selection) => {
-                            if let Some(selection) = selection {
-                                for (x, y, modifier) in handles!(selection.extents) {
-                                    if global_pos.distance_to(&(*x, *y))
-                                        <= self.config.handle_radius
-                                    {
-                                        selection.modifier = Some(*modifier);
-                                        selection.active = true;
-                                        return;
-                                    }
-                                }
-                                if selection.extents.to_rect().contains(&global_pos) {
-                                    selection.modifier = Some(SelectionModifier::Center(
-                                        global_pos.0,
-                                        global_pos.1,
-                                        selection.extents,
-                                    ));
-                                    selection.active = true;
-                                    return;
-                                }
+                        Selection::Rectangle(ref mut selection) => {
+                            let handles_state = RuntimeData::process_selection_handles(
+                                selection,
+                                global_pos,
+                                self.config.handle_radius,
+                            );
+                            if let HandlesState::Unchanged = handles_state {
+                                self.selection = Selection::Rectangle(Some(
+                                    RectangleSelection::new(global_pos.0, global_pos.1),
+                                ));
                             }
-
-                            self.selection = Selection::Rectangle(Some(RectangleSelection::new(
-                                global_pos.0,
-                                global_pos.1,
-                            )));
                         }
                         Selection::Display(_) => {
                             self.selection = Selection::Display(Some(DisplaySelection::new(
@@ -128,11 +112,27 @@ impl PointerHandler for RuntimeData {
                             )));
                         }
                         Selection::Window(_) => {
-                            self.selection = Selection::Window(
-                                self.windows
-                                    .find_by_position(global_pos.0, global_pos.1)
-                                    .cloned(),
-                            );
+                            let win_sel = self
+                                .windows
+                                .find_by_position(global_pos.0, global_pos.1)
+                                .cloned();
+
+                            if win_sel.is_some() {
+                                self.selection = Selection::Window(win_sel);
+                            } else {
+                                let mut flattened_selection = self.selection.flattened();
+                                if let Selection::Rectangle(ref mut rect_sel) = flattened_selection
+                                {
+                                    let handles_state = RuntimeData::process_selection_handles(
+                                        rect_sel,
+                                        global_pos,
+                                        self.config.handle_radius,
+                                    );
+                                    if let HandlesState::Changed = handles_state {
+                                        self.selection = flattened_selection;
+                                    }
+                                }
+                            }
                         }
                     }
                 }
