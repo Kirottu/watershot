@@ -1,3 +1,5 @@
+#![feature(return_position_impl_trait_in_trait)]
+
 use std::io::{self, Cursor, Write};
 
 use chrono::Local;
@@ -15,7 +17,6 @@ mod runtime_data;
 mod traits;
 mod types;
 
-#[cfg(feature = "window-selection")]
 pub mod window;
 
 mod sctk_impls {

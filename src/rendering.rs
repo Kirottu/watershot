@@ -64,7 +64,6 @@ pub struct MonSpecificRendering {
     pub brush: wgpu_text::TextBrush<wgpu_text::glyph_brush::ab_glyph::FontArc>,
     rect_mode_section: OwnedSection,
     display_mode_section: OwnedSection,
-    #[cfg(feature = "window-selection")]
     window_mode_section: OwnedSection,
 }
 impl Renderer {
@@ -351,7 +350,6 @@ impl Renderer {
         if let Some(section) = match selection {
             Selection::Rectangle(None) => Some(&monitor.rendering.rect_mode_section),
             Selection::Display(None) => Some(&monitor.rendering.display_mode_section),
-            #[cfg(feature = "window-selection")]
             Selection::Window(None) => Some(&monitor.rendering.window_mode_section),
             _ => None,
         } {
@@ -555,7 +553,6 @@ impl MonSpecificRendering {
             .with_layout(layout)
             .with_screen_position(pos);
 
-        #[cfg(feature = "window-selection")]
         let window_mode_section = OwnedSection::default()
             .add_text(
                 OwnedText::new("WINDOW MODE")
@@ -577,7 +574,6 @@ impl MonSpecificRendering {
             brush,
             rect_mode_section,
             display_mode_section,
-            #[cfg(feature = "window-selection")]
             window_mode_section,
             shade_index_count: 0,
             sel_index_count: 0,

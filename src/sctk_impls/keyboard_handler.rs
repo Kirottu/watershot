@@ -52,11 +52,13 @@ impl KeyboardHandler for RuntimeData {
             // Switch selection mode
             keysyms::XKB_KEY_Tab => match &self.selection {
                 Selection::Rectangle(_) => self.selection = Selection::Display(None),
-                #[cfg(not(feature = "window-selection"))]
-                Selection::Display(_) => self.selection = Selection::Rectangle(None),
-                #[cfg(feature = "window-selection")]
-                Selection::Display(_) => self.selection = Selection::Window(None),
-                #[cfg(feature = "window-selection")]
+                Selection::Display(_) => {
+                    if self.compositor_backend.is_some() {
+                        self.selection = Selection::Window(None)
+                    } else {
+                        self.selection = Selection::Rectangle(None)
+                    }
+                }
                 Selection::Window(_) => self.selection = self.selection.flattened(),
             },
             // Exit with save if a valid selection exists
@@ -85,7 +87,6 @@ impl KeyboardHandler for RuntimeData {
 
                         self.exit = ExitState::ExitWithSelection(rect)
                     }
-                    #[cfg(feature = "window-selection")]
                     Selection::Window(_) => unreachable!(
                         "Window selection should have been flattened into Rectangle selection"
                     ),

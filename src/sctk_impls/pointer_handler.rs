@@ -10,10 +10,8 @@ use crate::{
     runtime_data::RuntimeData,
     traits::{Contains, DistanceTo, ToGlobal},
     types::{DisplaySelection, RectangleSelection, Selection, SelectionModifier},
+    window::FindWindowExt,
 };
-
-#[cfg(feature = "window-selection")]
-use crate::window::FindWindow;
 
 delegate_pointer!(RuntimeData);
 
@@ -129,7 +127,6 @@ impl PointerHandler for RuntimeData {
                                 event.surface.clone(),
                             )));
                         }
-                        #[cfg(feature = "window-selection")]
                         Selection::Window(_) => {
                             self.selection = Selection::Window(
                                 self.windows

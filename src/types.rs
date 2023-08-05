@@ -19,10 +19,9 @@ use wayland_client::{
     Connection, Proxy, QueueHandle,
 };
 
-use crate::{rendering::MonSpecificRendering, runtime_data::RuntimeData};
+use crate::{rendering::MonSpecificRendering, runtime_data::RuntimeData, window::DescribesWindow};
 
-#[cfg(feature = "window-selection")]
-use crate::window::{search::WindowSearchParam, DescribesWindow, WindowDescriptor};
+use crate::window::search::WindowSearchParam;
 
 #[derive(Parser, Clone, Debug)]
 #[command(author, version, about)]
@@ -46,22 +45,18 @@ pub struct Args {
     /// Pre-selects a window by its class, title or initial versions of the two.
     /// The value passed can be a regex.
     /// Examples: "class=Alacritty" , "title=.*Visual Studio Code.*"
-    #[cfg(feature = "window-selection")]
     #[arg(long, group = "capture-window")]
     pub window_search: Option<WindowSearchParam>,
 
     /// Pre-selects the window under the mouse cursor.
-    #[cfg(feature = "window-selection")]
     #[arg(long, group = "capture-window")]
     pub window_under_cursor: bool,
 
     /// Pre-selects the currently-focused window.
-    #[cfg(feature = "window-selection")]
     #[arg(long, group = "capture-window")]
     pub active_window: bool,
 
     /// Automatically captures the pre-selected window, skipping interactive mode.
-    #[cfg(feature = "window-selection")]
     #[arg(long)]
     pub auto_capture: bool,
 }
@@ -341,31 +336,33 @@ pub enum SelectionModifier {
     Center(i32, i32, Extents),
 }
 
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub enum Selection {
     Rectangle(Option<RectangleSelection>),
     Display(Option<DisplaySelection>),
-    #[cfg(feature = "window-selection")]
-    Window(Option<WindowDescriptor>),
+    Window(Option<Box<dyn DescribesWindow>>),
+}
+
+impl Default for Selection {
+    fn default() -> Self {
+        Self::Rectangle(None)
+    }
 }
 
 impl Selection {
     pub fn flattened(&self) -> Selection {
         match self {
-            #[cfg(feature = "window-selection")]
             Self::Window(Some(window)) => Self::Rectangle(Some(RectangleSelection {
                 extents: window.get_window_rect().to_extents(),
                 modifier: None,
                 active: false,
             })),
-            #[cfg(feature = "window-selection")]
             Self::Window(None) => Self::Rectangle(None),
             _ => self.clone(),
         }
     }
 
-    #[cfg(feature = "window-selection")]
-    pub fn from_window(window: Option<WindowDescriptor>) -> Self {
+    pub fn from_window(window: Option<Box<dyn DescribesWindow>>) -> Self {
         match window {
             Some(window) => Self::Window(Some(window)),
             None => Self::Rectangle(None),
