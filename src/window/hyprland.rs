@@ -1,7 +1,7 @@
 use std::collections::HashSet;
 
 use hyprland::{
-    data::{Client, Clients, CursorPosition, Monitors, Version, WorkspaceBasic},
+    data::{Client, Clients, CursorPosition, Monitors, Version},
     shared::{HyprData, HyprDataActiveOptional, WorkspaceId},
 };
 
@@ -16,8 +16,6 @@ pub struct HyprWindowDescriptor {
     initial_class: String,
     class: String,
     rect: Rect<i32>,
-    workspace: HyprWorkspaceDescriptor,
-    monitor: HyprMonitorDescriptor,
 }
 
 pub struct HyprlandBackend;
@@ -55,12 +53,6 @@ impl InitializeBackend for HyprlandBackend {
     }
 }
 
-#[derive(Debug, Clone)]
-pub struct HyprWorkspaceDescriptor(pub WorkspaceBasic);
-
-#[derive(Debug, Clone)]
-pub struct HyprMonitorDescriptor(i16);
-
 impl From<Client> for HyprWindowDescriptor {
     fn from(value: Client) -> Self {
         Self {
@@ -74,8 +66,6 @@ impl From<Client> for HyprWindowDescriptor {
                 width: value.size.0 as i32,
                 height: value.size.1 as i32,
             },
-            workspace: HyprWorkspaceDescriptor(value.workspace),
-            monitor: HyprMonitorDescriptor(value.monitor),
         }
     }
 }
