@@ -47,12 +47,14 @@ impl FindWindowExt for Vec<Box<dyn DescribesWindow>> {
         &self,
         param: search::WindowSearchParam,
     ) -> Option<&Box<dyn DescribesWindow>> {
+        use search::WindowSearchAttribute::*;
+
         self.iter().find(|window| {
             let attr_value = match param.attribute {
-                search::WindowSearchAttribute::InitialTitle => window.initial_title(),
-                search::WindowSearchAttribute::Title => window.title(),
-                search::WindowSearchAttribute::InitialClass => window.initial_class(),
-                search::WindowSearchAttribute::Class => window.class(),
+                InitialTitle => window.initial_title(),
+                Title => window.title(),
+                InitialClass => window.initial_class(),
+                Class => window.class(),
             };
 
             param.value.is_match(attr_value)
