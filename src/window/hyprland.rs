@@ -30,11 +30,15 @@ impl CompositorBackend for HyprlandBackend {
             .map(|monitor| monitor.active_workspace.id)
             .collect();
 
-        Clients::get()
+        let mut windows: Vec<_> = Clients::get()
             .unwrap()
             .filter(|client| active_workspace_ids.contains(&client.workspace.id))
             .map(|client| Box::new(HyprWindowDescriptor::from(client)) as Box<dyn DescribesWindow>)
-            .collect()
+            .collect();
+
+        windows.reverse();
+
+        windows
     }
 
     fn get_focused(&self) -> Option<Box<dyn DescribesWindow>> {
