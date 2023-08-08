@@ -265,7 +265,6 @@ impl RuntimeData {
                     selection.extents,
                 ));
                 selection.active = true;
-                return HandlesState::Changed;
             }
         }
 

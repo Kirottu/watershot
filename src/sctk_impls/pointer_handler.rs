@@ -112,24 +112,23 @@ impl PointerHandler for RuntimeData {
                             )));
                         }
                         Selection::Window(_) => {
-                            let win_sel = self
-                                .windows
-                                .find_by_position(global_pos.0, global_pos.1)
-                                .cloned();
-
-                            if win_sel.is_some() {
-                                self.selection = Selection::Window(win_sel);
-                            } else {
-                                let mut flattened_selection = self.selection.flattened();
-                                if let Selection::Rectangle(ref mut rect_sel) = flattened_selection
-                                {
-                                    let handles_state = RuntimeData::process_selection_handles(
-                                        rect_sel,
-                                        global_pos,
-                                        self.config.handle_radius,
-                                    );
-                                    if let HandlesState::Changed = handles_state {
-                                        self.selection = flattened_selection;
+                            let mut flattened_selection = self.selection.flattened();
+                            if let Selection::Rectangle(ref mut rect_sel) = flattened_selection {
+                                let handles_state = RuntimeData::process_selection_handles(
+                                    rect_sel,
+                                    global_pos,
+                                    self.config.handle_radius,
+                                );
+                                if let HandlesState::Changed = handles_state {
+                                    self.selection = flattened_selection;
+                                } else {
+                                    let win_sel = self
+                                        .windows
+                                        .find_by_position(&global_pos)
+                                        .cloned();
+    
+                                    if win_sel.is_some() {
+                                        self.selection = Selection::Window(win_sel);
                                     }
                                 }
                             }
