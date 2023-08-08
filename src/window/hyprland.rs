@@ -7,7 +7,7 @@ use hyprland::{
 
 use crate::types::Rect;
 
-use super::{CompositorBackend, DescribesWindow, GetsMouse, InitializeBackend};
+use super::{CompositorBackend, DescribesWindow, InitializeBackend};
 
 #[derive(Debug, Clone)]
 pub struct HyprWindowDescriptor {
@@ -46,6 +46,11 @@ impl CompositorBackend for HyprlandBackend {
             .ok()
             .flatten()
             .map(|client| Box::new(HyprWindowDescriptor::from(client)) as Box<dyn DescribesWindow>)
+    }
+
+    fn get_mouse_position(&self) -> (i32, i32) {
+        let CursorPosition { x, y } = CursorPosition::get().unwrap();
+        (x as i32, y as i32)
     }
 }
 
@@ -93,14 +98,5 @@ impl DescribesWindow for HyprWindowDescriptor {
 
     fn class(&self) -> &str {
         &self.class
-    }
-}
-
-pub struct HyprMouseGetter;
-
-impl GetsMouse for HyprMouseGetter {
-    fn get_mouse_position() -> (i32, i32) {
-        let CursorPosition { x, y } = CursorPosition::get().unwrap();
-        (x as i32, y as i32)
     }
 }

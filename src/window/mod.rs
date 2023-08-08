@@ -1,4 +1,4 @@
-use crate::{types::Rect, traits::Contains};
+use crate::{traits::Contains, types::Rect};
 
 use self::clone::DescribesWindowClone;
 
@@ -9,6 +9,7 @@ pub mod search;
 pub trait CompositorBackend {
     fn get_all_windows(&self) -> Vec<Box<dyn DescribesWindow>>;
     fn get_focused(&self) -> Option<Box<dyn DescribesWindow>>;
+    fn get_mouse_position(&self) -> (i32, i32);
 }
 
 pub trait InitializeBackend {
@@ -22,12 +23,6 @@ pub trait DescribesWindow: DescribesWindowClone {
     fn initial_class(&self) -> &str;
     fn class(&self) -> &str;
 }
-
-pub trait GetsMouse {
-    fn get_mouse_position() -> (i32, i32);
-}
-
-pub type MouseGetter = hyprland::HyprMouseGetter;
 
 pub trait FindWindowExt {
     fn find_by_position(&self, position: &(i32, i32)) -> Option<&Box<dyn DescribesWindow>>;

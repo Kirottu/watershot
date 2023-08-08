@@ -28,7 +28,7 @@ use crate::{
     Config, Monitor, Rect, Selection,
 };
 
-use crate::window::{DescribesWindow, GetsMouse, MouseGetter};
+use crate::window::DescribesWindow;
 
 /// The main data worked on at runtime
 pub struct RuntimeData {
@@ -137,7 +137,7 @@ impl RuntimeData {
 
                 let selection = match (args.window_search.take(), args.window_under_cursor, args.active_window) {
                     (None, true, false) => {
-                        let mouse_pos = MouseGetter::get_mouse_position();
+                        let mouse_pos = compositor_backend.get_mouse_position();
                         Selection::from_window(windows.find_by_position(&mouse_pos).cloned())
                     },
                     (Some(search_param), false, false) => Selection::from_window(windows.find_by_search_param(search_param).cloned()),
