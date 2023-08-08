@@ -1,4 +1,4 @@
-use crate::types::Rect;
+use crate::{types::Rect, traits::Contains};
 
 use self::clone::DescribesWindowClone;
 
@@ -40,7 +40,7 @@ pub trait FindWindowExt {
 impl FindWindowExt for Vec<Box<dyn DescribesWindow>> {
     fn find_by_position(&self, x: i32, y: i32) -> Option<&Box<dyn DescribesWindow>> {
         self.iter()
-            .find(|window| window.get_window_rect().contains_point(x, y))
+            .find(|window| window.get_window_rect().contains(&(x, y)))
     }
 
     fn find_by_search_param(
