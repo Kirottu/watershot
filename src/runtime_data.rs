@@ -137,8 +137,8 @@ impl RuntimeData {
 
                 let selection = match (args.window_search.take(), args.window_under_cursor, args.active_window) {
                     (None, true, false) => {
-                        let (mouse_x, mouse_y) = MouseGetter::get_mouse_position();
-                        Selection::from_window(windows.find_by_position(mouse_x, mouse_y).cloned())
+                        let mouse_pos = MouseGetter::get_mouse_position();
+                        Selection::from_window(windows.find_by_position(&mouse_pos).cloned())
                     },
                     (Some(search_param), false, false) => Selection::from_window(windows.find_by_search_param(search_param).cloned()),
                     (None, false, true) => Selection::from_window(compositor_backend.get_focused()),

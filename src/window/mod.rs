@@ -30,7 +30,7 @@ pub trait GetsMouse {
 pub type MouseGetter = hyprland::HyprMouseGetter;
 
 pub trait FindWindowExt {
-    fn find_by_position(&self, x: i32, y: i32) -> Option<&Box<dyn DescribesWindow>>;
+    fn find_by_position(&self, position: &(i32, i32)) -> Option<&Box<dyn DescribesWindow>>;
     fn find_by_search_param(
         &self,
         param: search::WindowSearchParam,
@@ -38,9 +38,9 @@ pub trait FindWindowExt {
 }
 
 impl FindWindowExt for Vec<Box<dyn DescribesWindow>> {
-    fn find_by_position(&self, x: i32, y: i32) -> Option<&Box<dyn DescribesWindow>> {
+    fn find_by_position(&self, position: &(i32, i32)) -> Option<&Box<dyn DescribesWindow>> {
         self.iter()
-            .find(|window| window.get_window_rect().contains(&(x, y)))
+            .find(|window| window.get_window_rect().contains(position))
     }
 
     fn find_by_search_param(
