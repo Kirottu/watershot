@@ -59,7 +59,7 @@ impl KeyboardHandler for RuntimeData {
                         self.selection = Selection::Rectangle(None)
                     }
                 }
-                Selection::Window(_) => self.selection = self.selection.flattened(),
+                Selection::Window(_) => self.selection = Selection::Rectangle(None),
             },
             // Exit with save if a valid selection exists
             keysyms::XKB_KEY_Return => {
