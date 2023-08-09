@@ -1,13 +1,13 @@
 use std::collections::HashSet;
 
 use hyprland::{
-    data::{Client, Clients, CursorPosition, Monitors, Version},
+    data::{Client, Clients, CursorPosition, Monitors},
     shared::{HyprData, HyprDataActiveOptional, WorkspaceId},
 };
 
 use crate::types::Rect;
 
-use super::{CompositorBackend, InitializeBackend, WindowDescriptor};
+use super::{CompositorBackend, CompositorNotAvailable, InitializeBackend, WindowDescriptor};
 
 pub struct HyprlandBackend;
 
@@ -47,9 +47,11 @@ impl CompositorBackend for HyprlandBackend {
 
 impl InitializeBackend for HyprlandBackend {
     fn try_new() -> Result<Box<dyn CompositorBackend>, super::CompositorNotAvailable> {
-        Version::get()
-            .map(|_| Box::new(HyprlandBackend) as Box<dyn CompositorBackend>)
-            .map_err(|_| super::CompositorNotAvailable::NotInstalled)
+        let mut env_vars = std::env::vars();
+        match env_vars.find(|(key, _value)| key == "HYPRLAND_INSTANCE_SIGNATURE") {
+            Some(_) => Ok(Box::new(HyprlandBackend) as Box<dyn CompositorBackend>),
+            None => Err(CompositorNotAvailable::NotRunning),
+        }
     }
 }
 
