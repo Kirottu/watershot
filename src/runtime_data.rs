@@ -136,15 +136,17 @@ impl RuntimeData {
             (selection, windows, exit) = {
                 let windows = compositor_backend.get_all_windows();
 
-                let selection = match (args.window_search.take(), args.window_under_cursor, args.active_window) {
-                    (None, true, false) => {
+                let selection = {
+                    if let Some(search_param) = args.window_search.take() {
+                        Selection::from_window(windows.find_by_search_param(search_param).cloned())
+                    } else if args.window_under_cursor {
                         let mouse_pos = compositor_backend.get_mouse_position();
                         Selection::from_window(windows.find_by_position(&mouse_pos).cloned())
-                    },
-                    (Some(search_param), false, false) => Selection::from_window(windows.find_by_search_param(search_param).cloned()),
-                    (None, false, true) => Selection::from_window(compositor_backend.get_focused()),
-                    (None, false, false) => Selection::default(),
-                    (Some(_), true, true) | (Some(_), true, false) | (Some(_), false, true) | (None, true, true) => unreachable!("All args belong to the same clap group and, therefore, there should never be two of them active at the same time"),
+                    } else if args.active_window {
+                        Selection::from_window(compositor_backend.get_focused())
+                    } else {
+                        Selection::default()
+                    }
                 };
 
                 if !args.auto_capture {
