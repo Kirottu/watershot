@@ -22,7 +22,8 @@ use crate::{
     rendering::Renderer,
     traits::{Contains, DistanceTo},
     types::{
-        Args, ExitState, HandlesState, MonitorIdentification, RectangleSelection, SelectionModifier,
+        Args, ExitState, MonitorIdentification, RectangleSelection, SelectionModifier,
+        SelectionState,
     },
     window::{
         hyprland::HyprlandBackend, CompositorBackend, FindWindowExt, InitializeBackend,
@@ -252,13 +253,13 @@ impl RuntimeData {
         rect_sel: &mut Option<RectangleSelection>,
         global_pos: (i32, i32),
         handle_radius: i32,
-    ) -> HandlesState {
+    ) -> SelectionState {
         if let Some(selection) = rect_sel {
             for (x, y, modifier) in handles!(selection.extents) {
                 if global_pos.distance_to(&(*x, *y)) <= handle_radius {
                     selection.modifier = Some(*modifier);
                     selection.active = true;
-                    return HandlesState::Changed;
+                    return SelectionState::HandlesChanged;
                 }
             }
             if selection.extents.to_rect().contains(&global_pos) {
@@ -268,9 +269,10 @@ impl RuntimeData {
                     selection.extents,
                 ));
                 selection.active = true;
+                return SelectionState::CenterChanged;
             }
         }
 
-        HandlesState::Unchanged
+        SelectionState::Unchanged
     }
 }

@@ -8,7 +8,7 @@ use smithay_client_toolkit::{
 use crate::{
     runtime_data::RuntimeData,
     traits::ToGlobal,
-    types::{DisplaySelection, HandlesState, RectangleSelection, Selection, SelectionModifier},
+    types::{DisplaySelection, RectangleSelection, Selection, SelectionModifier, SelectionState},
     window::FindWindowExt,
 };
 
@@ -100,7 +100,7 @@ impl PointerHandler for RuntimeData {
                                 global_pos,
                                 self.config.handle_radius,
                             );
-                            if let HandlesState::Unchanged = handles_state {
+                            if let SelectionState::Unchanged = handles_state {
                                 self.selection = Selection::Rectangle(Some(
                                     RectangleSelection::new(global_pos.0, global_pos.1),
                                 ));
@@ -119,7 +119,7 @@ impl PointerHandler for RuntimeData {
                                     global_pos,
                                     self.config.handle_radius,
                                 );
-                                if let HandlesState::Changed = handles_state {
+                                if let SelectionState::HandlesChanged = handles_state {
                                     self.selection = flattened_selection;
                                 } else {
                                     let win_sel =

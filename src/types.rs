@@ -420,8 +420,9 @@ pub struct RawWgpuHandles {
     display: RawDisplayHandle,
 }
 
-pub enum HandlesState {
-    Changed,
+pub enum SelectionState {
+    CenterChanged,
+    HandlesChanged,
     Unchanged,
 }
 
