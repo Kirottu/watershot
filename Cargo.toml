@@ -20,8 +20,11 @@ clap = { version = "4.0.32", features = ["derive"] }
 chrono = "0.4.23"
 env_logger = { version = "0.10.0", default-features = false, features = ["auto-color"] }
 log = "0.4.17"
-wgpu = "0.16.1"
+wgpu = "0.17.0"
 raw-window-handle = "0.5.2"
 pollster = "0.3.0"
 bytemuck = { version = "1.13.1", features = ["derive"] }
-wgpu_text = "0.8.1"
+wgpu_text = "0.8.3"
+regex = "1.9.1"
+hyprland = "0.3.8"
+strum = { version = "0.25.0", features = ["derive", "strum_macros"] }

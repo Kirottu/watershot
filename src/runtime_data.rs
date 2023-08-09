@@ -18,8 +18,17 @@ use smithay_client_toolkit::{
 };
 
 use crate::{
+    handles,
     rendering::Renderer,
-    types::{Args, ExitState, MonitorIdentification},
+    traits::{Contains, DistanceTo},
+    types::{
+        Args, ExitState, MonitorIdentification, RectangleSelection, SelectionModifier,
+        SelectionState,
+    },
+    window::{
+        hyprland::HyprlandBackend, CompositorBackend, FindWindowExt, InitializeBackend,
+        WindowDescriptor,
+    },
     Config, Monitor, Rect, Selection,
 };
 
@@ -47,7 +56,7 @@ pub struct RuntimeData {
     pub selection: Selection,
     pub monitors: Vec<Monitor>,
     pub config: Config,
-    pub font: wgpu_text::font::FontArc,
+    pub font: wgpu_text::glyph_brush::ab_glyph::FontArc,
     pub image: DynamicImage,
     pub exit: ExitState,
     pub args: Args,
@@ -58,10 +67,17 @@ pub struct RuntimeData {
     pub queue: wgpu::Queue,
 
     pub renderer: Renderer,
+
+    pub compositor_backend: Option<Box<dyn CompositorBackend>>,
+    pub windows: Vec<WindowDescriptor>,
 }
 
 impl RuntimeData {
-    pub fn new(qh: &QueueHandle<Self>, globals: &GlobalList, args: Args) -> Self {
+    pub fn get_preferred_backend() -> Option<Box<dyn CompositorBackend>> {
+        HyprlandBackend::try_new().ok()
+    }
+
+    pub fn new(qh: &QueueHandle<Self>, globals: &GlobalList, mut args: Args) -> Self {
         let output = Command::new(args.grim.as_ref().unwrap_or(&"grim".to_string()))
             .arg("-t")
             .arg("ppm")
@@ -111,6 +127,44 @@ impl RuntimeData {
 
         let renderer = Renderer::new(&device, &config);
 
+        let compositor_backend = Self::get_preferred_backend();
+
+        let mut selection = Selection::default();
+        let mut windows = Vec::default();
+        let mut exit = ExitState::None;
+
+        if let Some(ref compositor_backend) = compositor_backend {
+            (selection, windows, exit) = {
+                let windows = compositor_backend.get_all_windows();
+
+                let selection = {
+                    if let Some(search_param) = args.window_search.take() {
+                        Selection::from_window(windows.find_by_search_param(search_param).cloned())
+                    } else if args.window_under_cursor {
+                        let mouse_pos = compositor_backend.get_mouse_position();
+                        Selection::from_window(windows.find_by_position(&mouse_pos).cloned())
+                    } else if args.active_window {
+                        Selection::from_window(compositor_backend.get_focused())
+                    } else {
+                        Selection::default()
+                    }
+                };
+
+                if !args.auto_capture {
+                    (selection, windows, ExitState::None)
+                } else if let Selection::Rectangle(Some(rect_sel)) = selection.flattened() {
+                    (
+                        selection,
+                        windows,
+                        ExitState::ExitWithSelection(rect_sel.extents.to_rect()),
+                    )
+                } else {
+                    // TODO: Auto-capture for monitors
+                    (selection, windows, ExitState::None)
+                }
+            };
+        }
+
         RuntimeData {
             registry_state: RegistryState::new(globals),
             seat_state: SeatState::new(globals, qh),
@@ -118,7 +172,7 @@ impl RuntimeData {
             compositor_state,
             layer_state: LayerShell::bind(globals, qh).expect("layer shell is not available"),
             shm_state: Shm::bind(globals, qh).expect("wl_shm is not available"),
-            selection: Selection::Rectangle(None),
+            selection,
             config,
             area: Rect::default(),
             monitors: Vec::new(),
@@ -128,7 +182,7 @@ impl RuntimeData {
             keyboard: None,
             pointer: None,
             themed_pointer: None,
-            exit: ExitState::None,
+            exit,
             args,
             pointer_surface,
             instance,
@@ -136,10 +190,12 @@ impl RuntimeData {
             device,
             queue,
             renderer,
-            font: wgpu_text::font::FontArc::try_from_vec(
+            font: wgpu_text::glyph_brush::ab_glyph::FontArc::try_from_vec(
                 fs::read(fc_font.path).expect("Failed to load font"),
             )
             .expect("Invalid font data"),
+            compositor_backend,
+            windows,
         }
     }
 
@@ -191,5 +247,32 @@ impl RuntimeData {
         monitor.wl_surface.frame(qh, monitor.wl_surface.clone());
         surface_texture.present();
         monitor.wl_surface.commit();
+    }
+
+    pub fn process_selection_handles(
+        rect_sel: &mut Option<RectangleSelection>,
+        global_pos: (i32, i32),
+        handle_radius: i32,
+    ) -> SelectionState {
+        if let Some(selection) = rect_sel {
+            for (x, y, modifier) in handles!(selection.extents) {
+                if global_pos.distance_to(&(*x, *y)) <= handle_radius {
+                    selection.modifier = Some(*modifier);
+                    selection.active = true;
+                    return SelectionState::HandlesChanged;
+                }
+            }
+            if selection.extents.to_rect().contains(&global_pos) {
+                selection.modifier = Some(SelectionModifier::Center(
+                    global_pos.0,
+                    global_pos.1,
+                    selection.extents,
+                ));
+                selection.active = true;
+                return SelectionState::CenterChanged;
+            }
+        }
+
+        SelectionState::Unchanged
     }
 }

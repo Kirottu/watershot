@@ -14,6 +14,9 @@ mod macros;
 mod runtime_data;
 mod traits;
 mod types;
+
+pub mod window;
+
 mod sctk_impls {
     mod compositor_handler;
     mod keyboard_handler;

@@ -1,7 +1,7 @@
 use image::RgbaImage;
 use smithay_client_toolkit::output::OutputInfo;
 use wgpu::util::DeviceExt;
-use wgpu_text::section::{HorizontalAlign, Layout, OwnedSection, OwnedText, VerticalAlign};
+use wgpu_text::glyph_brush::{HorizontalAlign, Layout, OwnedSection, OwnedText, VerticalAlign};
 
 use crate::{
     handles,
@@ -61,9 +61,10 @@ pub struct MonSpecificRendering {
     /// Bind group for the resolve target texture
     ms_bind_group: wgpu::BindGroup,
 
-    pub brush: wgpu_text::TextBrush<wgpu_text::font::FontArc>,
+    pub brush: wgpu_text::TextBrush<wgpu_text::glyph_brush::ab_glyph::FontArc>,
     rect_mode_section: OwnedSection,
     display_mode_section: OwnedSection,
+    window_mode_section: OwnedSection,
 }
 impl Renderer {
     pub fn new(device: &wgpu::Device, config: &Config) -> Self {
@@ -349,6 +350,7 @@ impl Renderer {
         if let Some(section) = match selection {
             Selection::Rectangle(None) => Some(&monitor.rendering.rect_mode_section),
             Selection::Display(None) => Some(&monitor.rendering.display_mode_section),
+            Selection::Window(None) => Some(&monitor.rendering.window_mode_section),
             _ => None,
         } {
             monitor
@@ -551,6 +553,15 @@ impl MonSpecificRendering {
             .with_layout(layout)
             .with_screen_position(pos);
 
+        let window_mode_section = OwnedSection::default()
+            .add_text(
+                OwnedText::new("WINDOW MODE")
+                    .with_scale((runtime_data.config.mode_text_size * info.scale_factor) as f32)
+                    .with_color(runtime_data.config.text_color),
+            )
+            .with_layout(layout)
+            .with_screen_position(pos);
+
         Self {
             bg_bind_group,
             shade_vertex_buffer,
@@ -563,6 +574,7 @@ impl MonSpecificRendering {
             brush,
             rect_mode_section,
             display_mode_section,
+            window_mode_section,
             shade_index_count: 0,
             sel_index_count: 0,
         }
@@ -576,12 +588,14 @@ impl MonSpecificRendering {
         config: &Config,
         queue: &wgpu::Queue,
     ) {
+        let flatten_selection = selection.flattened();
+
         let (shade_vertices, shade_indices, sel_vertices, sel_indices): (
             Vec<[f32; 2]>,
             Vec<u32>,
             Vec<[f32; 2]>,
             Vec<u32>,
-        ) = match selection {
+        ) = match flatten_selection {
             Selection::Rectangle(Some(selection)) => {
                 match selection.extents.to_rect().constrain(mon_rect) {
                     None => {

@@ -19,9 +19,11 @@ use wayland_client::{
     Connection, Proxy, QueueHandle,
 };
 
-use crate::{rendering::MonSpecificRendering, runtime_data::RuntimeData};
+use crate::{rendering::MonSpecificRendering, runtime_data::RuntimeData, window::WindowDescriptor};
 
-#[derive(Parser, Clone)]
+use crate::window::search::WindowSearchParam;
+
+#[derive(Parser, Clone, Debug)]
 #[command(author, version, about)]
 pub struct Args {
     /// Copy the screenshot after exit
@@ -39,9 +41,27 @@ pub struct Args {
     /// Save the image into a file
     #[command(subcommand)]
     pub save: Option<SaveLocation>,
+
+    /// Pre-selects a window by its class, title or initial versions of the two.
+    /// The value passed can be a regex.
+    /// Examples: "class=Alacritty" , "title=.*Visual Studio Code.*"
+    #[arg(long, group = "capture-window")]
+    pub window_search: Option<WindowSearchParam>,
+
+    /// Pre-selects the window under the mouse cursor.
+    #[arg(long, group = "capture-window")]
+    pub window_under_cursor: bool,
+
+    /// Pre-selects the currently-focused window.
+    #[arg(long, group = "capture-window")]
+    pub active_window: bool,
+
+    /// Automatically captures the pre-selected window, skipping interactive mode.
+    #[arg(long)]
+    pub auto_capture: bool,
 }
 
-#[derive(Subcommand, Clone)]
+#[derive(Subcommand, Clone, Debug)]
 pub enum SaveLocation {
     /// The path to save the image to
     Path { path: String },
@@ -108,7 +128,7 @@ pub struct Color {
     pub a: f32,
 }
 
-impl From<Color> for wgpu_text::section::Color {
+impl From<Color> for wgpu_text::glyph_brush::Color {
     fn from(val: Color) -> Self {
         [val.r, val.g, val.b, val.a]
     }
@@ -312,17 +332,48 @@ pub enum SelectionModifier {
     Center(i32, i32, Extents),
 }
 
+#[derive(Clone)]
 pub enum Selection {
     Rectangle(Option<RectangleSelection>),
     Display(Option<DisplaySelection>),
+    Window(Option<WindowDescriptor>),
 }
 
+impl Default for Selection {
+    fn default() -> Self {
+        Self::Rectangle(None)
+    }
+}
+
+impl Selection {
+    pub fn flattened(&self) -> Selection {
+        match self {
+            Self::Window(Some(window)) => Self::Rectangle(Some(RectangleSelection {
+                extents: window.rect.to_extents(),
+                modifier: None,
+                active: false,
+            })),
+            Self::Window(None) => Self::Rectangle(None),
+            _ => self.clone(),
+        }
+    }
+
+    pub fn from_window(window: Option<WindowDescriptor>) -> Self {
+        match window {
+            Some(window) => Self::Window(Some(window)),
+            None => Self::Rectangle(None),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy)]
 pub struct RectangleSelection {
     pub extents: Extents,
     pub modifier: Option<SelectionModifier>,
     pub active: bool,
 }
 
+#[derive(Debug, Clone)]
 pub struct DisplaySelection {
     pub wl_surface: wl_surface::WlSurface,
 }
@@ -367,6 +418,12 @@ pub enum ExitState {
 pub struct RawWgpuHandles {
     window: RawWindowHandle,
     display: RawDisplayHandle,
+}
+
+pub enum SelectionState {
+    CenterChanged,
+    HandlesChanged,
+    Unchanged,
 }
 
 impl RawWgpuHandles {

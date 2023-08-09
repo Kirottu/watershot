@@ -52,34 +52,47 @@ impl KeyboardHandler for RuntimeData {
             // Switch selection mode
             keysyms::XKB_KEY_Tab => match &self.selection {
                 Selection::Rectangle(_) => self.selection = Selection::Display(None),
-                Selection::Display(_) => self.selection = Selection::Rectangle(None),
+                Selection::Display(_) => {
+                    if self.compositor_backend.is_some() {
+                        self.selection = Selection::Window(None)
+                    } else {
+                        self.selection = Selection::Rectangle(None)
+                    }
+                }
+                Selection::Window(_) => self.selection = Selection::Rectangle(None),
             },
             // Exit with save if a valid selection exists
-            keysyms::XKB_KEY_Return => match &self.selection {
-                Selection::Rectangle(Some(selection)) => {
-                    let mut rect = selection.extents.to_rect();
-                    // Alter coordinate space so the rect can be used to crop from the original image
-                    rect.x -= self.area.x;
-                    rect.y -= self.area.y;
+            keysyms::XKB_KEY_Return => {
+                let flattened_selection = self.selection.flattened();
+                match flattened_selection {
+                    Selection::Rectangle(Some(selection)) => {
+                        let mut rect = selection.extents.to_rect();
+                        // Alter coordinate space so the rect can be used to crop from the original image
+                        rect.x -= self.area.x;
+                        rect.y -= self.area.y;
 
-                    self.exit = ExitState::ExitWithSelection(rect)
+                        self.exit = ExitState::ExitWithSelection(rect)
+                    }
+                    Selection::Display(Some(selection)) => {
+                        let monitor = self
+                            .monitors
+                            .iter()
+                            .find(|monitor| monitor.wl_surface == selection.wl_surface)
+                            .unwrap();
+
+                        let mut rect = monitor.rect;
+
+                        rect.x -= self.area.x;
+                        rect.y -= self.area.y;
+
+                        self.exit = ExitState::ExitWithSelection(rect)
+                    }
+                    Selection::Window(_) => unreachable!(
+                        "Window selection should have been flattened into Rectangle selection"
+                    ),
+                    _ => (),
                 }
-                Selection::Display(Some(selection)) => {
-                    let monitor = self
-                        .monitors
-                        .iter()
-                        .find(|monitor| monitor.wl_surface == selection.wl_surface)
-                        .unwrap();
-
-                    let mut rect = monitor.rect;
-
-                    rect.x -= self.area.x;
-                    rect.y -= self.area.y;
-
-                    self.exit = ExitState::ExitWithSelection(rect)
-                }
-                _ => (),
-            },
+            }
             _ => (),
         }
     }
