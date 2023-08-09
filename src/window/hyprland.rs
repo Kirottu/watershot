@@ -7,21 +7,12 @@ use hyprland::{
 
 use crate::types::Rect;
 
-use super::{CompositorBackend, DescribesWindow, InitializeBackend};
-
-#[derive(Debug, Clone)]
-pub struct HyprWindowDescriptor {
-    initial_title: String,
-    title: String,
-    initial_class: String,
-    class: String,
-    rect: Rect<i32>,
-}
+use super::{CompositorBackend, InitializeBackend, WindowDescriptor};
 
 pub struct HyprlandBackend;
 
 impl CompositorBackend for HyprlandBackend {
-    fn get_all_windows(&self) -> Vec<Box<dyn DescribesWindow>> {
+    fn get_all_windows(&self) -> Vec<WindowDescriptor> {
         // TODO: Sepecial Workspaces don't appear under monitors, therefore
         // windows from specials can't be focused yet.
         let active_workspace_ids: HashSet<WorkspaceId> = Monitors::get()
@@ -33,7 +24,7 @@ impl CompositorBackend for HyprlandBackend {
         let mut windows: Vec<_> = Clients::get()
             .unwrap()
             .filter(|client| active_workspace_ids.contains(&client.workspace.id))
-            .map(|client| Box::new(HyprWindowDescriptor::from(client)) as Box<dyn DescribesWindow>)
+            .map(WindowDescriptor::from)
             .collect();
 
         windows.reverse();
@@ -41,11 +32,11 @@ impl CompositorBackend for HyprlandBackend {
         windows
     }
 
-    fn get_focused(&self) -> Option<Box<dyn DescribesWindow>> {
+    fn get_focused(&self) -> Option<WindowDescriptor> {
         Client::get_active()
             .ok()
             .flatten()
-            .map(|client| Box::new(HyprWindowDescriptor::from(client)) as Box<dyn DescribesWindow>)
+            .map(WindowDescriptor::from)
     }
 
     fn get_mouse_position(&self) -> (i32, i32) {
@@ -62,7 +53,7 @@ impl InitializeBackend for HyprlandBackend {
     }
 }
 
-impl From<Client> for HyprWindowDescriptor {
+impl From<Client> for WindowDescriptor {
     fn from(value: Client) -> Self {
         Self {
             initial_title: value.initial_title,
@@ -76,27 +67,5 @@ impl From<Client> for HyprWindowDescriptor {
                 height: value.size.1 as i32,
             },
         }
-    }
-}
-
-impl DescribesWindow for HyprWindowDescriptor {
-    fn get_window_rect(&self) -> Rect<i32> {
-        self.rect
-    }
-
-    fn initial_title(&self) -> &str {
-        &self.initial_title
-    }
-
-    fn title(&self) -> &str {
-        &self.title
-    }
-
-    fn initial_class(&self) -> &str {
-        &self.initial_class
-    }
-
-    fn class(&self) -> &str {
-        &self.class
     }
 }

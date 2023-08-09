@@ -19,7 +19,7 @@ use wayland_client::{
     Connection, Proxy, QueueHandle,
 };
 
-use crate::{rendering::MonSpecificRendering, runtime_data::RuntimeData, window::DescribesWindow};
+use crate::{rendering::MonSpecificRendering, runtime_data::RuntimeData, window::WindowDescriptor};
 
 use crate::window::search::WindowSearchParam;
 
@@ -336,7 +336,7 @@ pub enum SelectionModifier {
 pub enum Selection {
     Rectangle(Option<RectangleSelection>),
     Display(Option<DisplaySelection>),
-    Window(Option<Box<dyn DescribesWindow>>),
+    Window(Option<WindowDescriptor>),
 }
 
 impl Default for Selection {
@@ -349,7 +349,7 @@ impl Selection {
     pub fn flattened(&self) -> Selection {
         match self {
             Self::Window(Some(window)) => Self::Rectangle(Some(RectangleSelection {
-                extents: window.get_window_rect().to_extents(),
+                extents: window.rect.to_extents(),
                 modifier: None,
                 active: false,
             })),
@@ -358,7 +358,7 @@ impl Selection {
         }
     }
 
-    pub fn from_window(window: Option<Box<dyn DescribesWindow>>) -> Self {
+    pub fn from_window(window: Option<WindowDescriptor>) -> Self {
         match window {
             Some(window) => Self::Window(Some(window)),
             None => Self::Rectangle(None),

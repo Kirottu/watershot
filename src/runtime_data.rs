@@ -24,11 +24,12 @@ use crate::{
     types::{
         Args, ExitState, HandlesState, MonitorIdentification, RectangleSelection, SelectionModifier,
     },
-    window::{hyprland::HyprlandBackend, CompositorBackend, FindWindowExt, InitializeBackend},
+    window::{
+        hyprland::HyprlandBackend, CompositorBackend, FindWindowExt, InitializeBackend,
+        WindowDescriptor,
+    },
     Config, Monitor, Rect, Selection,
 };
-
-use crate::window::DescribesWindow;
 
 /// The main data worked on at runtime
 pub struct RuntimeData {
@@ -67,7 +68,7 @@ pub struct RuntimeData {
     pub renderer: Renderer,
 
     pub compositor_backend: Option<Box<dyn CompositorBackend>>,
-    pub windows: Vec<Box<dyn DescribesWindow>>,
+    pub windows: Vec<WindowDescriptor>,
 }
 
 impl RuntimeData {
