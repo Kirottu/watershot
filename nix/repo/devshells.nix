@@ -8,11 +8,17 @@ in
     default = {
       name = "Watershot";
       packages = with nixpkgs; [
+        # Rust tooling
         rustc
-        cargo
         rustfmt
         clippy
+        cargo
+        cargo-watch
+        cargo-edit
+        cargo-tarpaulin
+        cargo-nextest
 
+        # Dependencies
         fontconfig
         pkgconfig
         libxkbcommon
