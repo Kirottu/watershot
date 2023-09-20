@@ -50,7 +50,7 @@ mod tests {
         use WindowSearchAttribute::*;
 
         let params_and_expected = [
-            ("initial_title=^hello$", Title),
+            ("initial_title=^hello$", InitialTitle),
             ("title=^hello$", Title),
             ("initial_class=^hello$", InitialClass),
             ("class=^hello$", Class),
