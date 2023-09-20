@@ -139,11 +139,11 @@ pub struct Monitor {
     pub layer: LayerSurface,
     pub wl_surface: wl_surface::WlSurface,
     pub surface: wgpu::Surface,
+    pub output_info: OutputInfo,
     pub rect: Rect<i32>,
     pub image: DynamicImage,
     /// The wayland scale factor for this monitor
-    pub scale_factor: i32,
-    pub rendering: MonSpecificRendering,
+    pub rendering: Option<MonSpecificRendering>,
 }
 
 impl Monitor {
@@ -174,8 +174,6 @@ impl Monitor {
 
         layer.commit();
 
-        let handle = RawWgpuHandles::new(conn, &wl_surface);
-
         // Each monitor also gets their own screenshot to preserve clarity as much as possible
         let grim_output = Command::new(
             runtime_data
@@ -197,18 +195,18 @@ impl Monitor {
             image::io::Reader::with_format(Cursor::new(grim_output), image::ImageFormat::Pnm)
                 .decode()
                 .expect("Failed to parse grim image!");
+        let handle = RawWgpuHandles::new(conn, &wl_surface);
 
         let surface = unsafe { runtime_data.instance.create_surface(&handle).unwrap() };
-        let rendering = MonSpecificRendering::new(&rect, &info, image.to_rgba8(), runtime_data);
 
         Self {
             layer,
             wl_surface,
             rect,
+            output_info: info,
             image,
-            scale_factor: info.scale_factor,
             surface,
-            rendering,
+            rendering: None,
         }
     }
 }
