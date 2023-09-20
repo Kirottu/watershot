@@ -22,9 +22,9 @@ const RECT_VERTICES: &[[f32; 2]] = &[TOP_RIGHT, TOP_LEFT, BOTTOM_LEFT, BOTTOM_RI
 const RECT_INDICES: &[u32] = &[0, 1, 2, 0, 2, 3];
 
 pub const CIRCLE_EDGES: u32 = 64;
-// 3 indicies per edge/triangle
+// 3 indices per edge/triangle
 // 8 circles per selection highlight
-// 24 indicies from the selection highlight rectangle
+// 24 indices from the selection highlight rectangle
 const MAX_SEL_INDICES: u64 = CIRCLE_EDGES as u64 * 3 * 8 + 24;
 
 const OVERLAY_MSAA: u32 = 4;
@@ -327,7 +327,7 @@ impl Renderer {
             render_pass.set_bind_group(0, &self.sel_bind_group, &[]);
             render_pass.draw_indexed(0..monitor.rendering.sel_index_count, 0, 0..1);
         }
-        // Draw the resolve target texture ontop
+        // Draw the resolve target texture on top
         {
             let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
                 label: None,

@@ -13,7 +13,7 @@ pub struct HyprlandBackend;
 
 impl CompositorBackend for HyprlandBackend {
     fn get_all_windows(&self) -> Vec<WindowDescriptor> {
-        // TODO: Sepecial Workspaces don't appear under monitors, therefore
+        // TODO: Special Workspaces don't appear under monitors, therefore
         // windows from specials can't be focused yet.
         let active_workspace_ids: HashSet<WorkspaceId> = Monitors::get()
             .unwrap()
