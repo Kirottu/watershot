@@ -1,4 +1,4 @@
-use std::{fs, io::Cursor, process::Command};
+use std::fs;
 
 use fontconfig::Fontconfig;
 use image::DynamicImage;
@@ -18,6 +18,7 @@ use smithay_client_toolkit::{
 };
 
 use crate::{
+    capture::{grim, portal},
     handles,
     rendering::Renderer,
     traits::{Contains, DistanceTo},
@@ -78,17 +79,7 @@ impl RuntimeData {
     }
 
     pub fn new(qh: &QueueHandle<Self>, globals: &GlobalList, mut args: Args) -> Self {
-        let output = Command::new(args.grim.as_ref().unwrap_or(&"grim".to_string()))
-            .arg("-t")
-            .arg("ppm")
-            .arg("-")
-            .output()
-            .expect("Failed to run grim command!")
-            .stdout;
-
-        let image = image::io::Reader::with_format(Cursor::new(output), image::ImageFormat::Pnm)
-            .decode()
-            .expect("Failed to parse grim image!");
+        let image = portal().or_else(|_| grim(&args)).unwrap();
 
         let config = Config::load().unwrap_or_default();
 
