@@ -4,7 +4,11 @@ use smithay_client_toolkit::{
     shell::wlr_layer::{LayerShellHandler, LayerSurface, LayerSurfaceConfigure},
 };
 
-use crate::{runtime_data::RuntimeData, types::MonitorIdentification};
+use crate::{
+    rendering::{MonSpecificRendering, Renderer},
+    runtime_data::RuntimeData,
+    types::MonitorIdentification,
+};
 
 delegate_layer!(RuntimeData);
 
@@ -31,23 +35,45 @@ impl LayerShellHandler for RuntimeData {
 
         let monitor = self
             .monitors
-            .iter_mut()
+            .iter()
             .find(|window| window.layer == *layer)
             .unwrap();
+
         let cap = monitor.surface.get_capabilities(&self.adapter);
+
+        if self.renderer.is_none() {
+            self.renderer = Some(Renderer::new(&self.device, &self.config, cap.formats[0]));
+        }
 
         monitor.surface.configure(
             &self.device,
             &wgpu::SurfaceConfiguration {
                 usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
-                format: wgpu::TextureFormat::Bgra8UnormSrgb,
-                width: (monitor.rect.width * monitor.scale_factor) as u32,
-                height: (monitor.rect.height * monitor.scale_factor) as u32,
+                format: cap.formats[0],
+                width: (monitor.rect.width * monitor.output_info.scale_factor) as u32,
+                height: (monitor.rect.height * monitor.output_info.scale_factor) as u32,
                 present_mode: wgpu::PresentMode::Mailbox,
                 alpha_mode: wgpu::CompositeAlphaMode::Opaque,
-                view_formats: vec![wgpu::TextureFormat::Bgra8UnormSrgb],
+                view_formats: vec![cap.formats[0]],
             },
         );
+
+        let mon_rendering = MonSpecificRendering::new(
+            &monitor.rect,
+            &monitor.output_info,
+            cap.formats[0],
+            monitor.image.to_rgba8(),
+            self,
+        );
+
+        // Reborrow mutably to set the renderer
+        let monitor = self
+            .monitors
+            .iter_mut()
+            .find(|window| window.layer == *layer)
+            .unwrap();
+
+        monitor.rendering = Some(mon_rendering);
 
         log::info!("{:?}", cap.formats);
 

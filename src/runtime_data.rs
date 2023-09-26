@@ -66,7 +66,7 @@ pub struct RuntimeData {
     pub adapter: wgpu::Adapter,
     pub queue: wgpu::Queue,
 
-    pub renderer: Renderer,
+    pub renderer: Option<Renderer>,
 
     pub compositor_backend: Option<Box<dyn CompositorBackend>>,
     pub windows: Vec<WindowDescriptor>,
@@ -124,8 +124,6 @@ impl RuntimeData {
             None,
         ))
         .unwrap();
-
-        let renderer = Renderer::new(&device, &config);
 
         let compositor_backend = Self::get_preferred_backend();
 
@@ -189,7 +187,7 @@ impl RuntimeData {
             adapter,
             device,
             queue,
-            renderer,
+            renderer: None,
             font: wgpu_text::glyph_brush::ab_glyph::FontArc::try_from_vec(
                 fs::read(fc_font.path).expect("Failed to load font"),
             )
@@ -200,6 +198,10 @@ impl RuntimeData {
     }
 
     pub fn draw(&mut self, identification: MonitorIdentification, qh: &QueueHandle<Self>) {
+        let Some(renderer) = &mut self.renderer else {
+            return
+        };
+
         let monitor = match identification {
             MonitorIdentification::Layer(layer) => self
                 .monitors
@@ -213,13 +215,15 @@ impl RuntimeData {
                 .unwrap(),
         };
 
-        monitor.rendering.update_overlay_vertices(
-            &monitor.rect,
-            &monitor.wl_surface,
-            &self.selection,
-            &self.config,
-            &self.queue,
-        );
+        if let Some(rendering) = &mut monitor.rendering {
+            rendering.update_overlay_vertices(
+                &monitor.rect,
+                &monitor.wl_surface,
+                &self.selection,
+                &self.config,
+                &self.queue,
+            );
+        }
 
         let surface_texture = monitor.surface.get_current_texture().unwrap();
         let texture_view = surface_texture
@@ -230,7 +234,7 @@ impl RuntimeData {
             .device
             .create_command_encoder(&wgpu::CommandEncoderDescriptor::default());
 
-        self.renderer.render(
+        renderer.render(
             &mut encoder,
             &texture_view,
             monitor,

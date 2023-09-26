@@ -66,8 +66,9 @@ pub struct MonSpecificRendering {
     display_mode_section: OwnedSection,
     window_mode_section: OwnedSection,
 }
+
 impl Renderer {
-    pub fn new(device: &wgpu::Device, config: &Config) -> Self {
+    pub fn new(device: &wgpu::Device, config: &Config, format: wgpu::TextureFormat) -> Self {
         let tex_shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
             label: Some("Background shader"),
             source: wgpu::ShaderSource::Wgsl(include_str!("../res/texture.wgsl").into()),
@@ -113,7 +114,7 @@ impl Renderer {
                 module: &tex_shader,
                 entry_point: "fs_main",
                 targets: &[Some(wgpu::ColorTargetState {
-                    format: wgpu::TextureFormat::Bgra8UnormSrgb,
+                    format,
                     blend: Some(wgpu::BlendState::PREMULTIPLIED_ALPHA_BLENDING),
                     write_mask: wgpu::ColorWrites::ALL,
                 })],
@@ -189,7 +190,7 @@ impl Renderer {
                 module: &color_shapes_shader,
                 entry_point: "fs_main",
                 targets: &[Some(wgpu::ColorTargetState {
-                    format: wgpu::TextureFormat::Bgra8UnormSrgb,
+                    format,
                     blend: Some(wgpu::BlendState::ALPHA_BLENDING),
                     write_mask: wgpu::ColorWrites::ALL,
                 })],
@@ -262,6 +263,9 @@ impl Renderer {
         device: &wgpu::Device,
         queue: &wgpu::Queue,
     ) {
+        let Some(rendering) = &mut monitor.rendering else {
+            return
+        };
         // Render the screenshot as the background
         {
             let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
@@ -278,7 +282,7 @@ impl Renderer {
             });
             render_pass.set_pipeline(&self.tex_pipeline);
             render_pass.set_vertex_buffer(0, self.tex_vertex_buffer.slice(..));
-            render_pass.set_bind_group(0, &monitor.rendering.bg_bind_group, &[]);
+            render_pass.set_bind_group(0, &rendering.bg_bind_group, &[]);
             render_pass.draw(0..6, 0..1);
         }
         // Draw the shade to the multisampling texture
@@ -286,7 +290,7 @@ impl Renderer {
             let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
                 label: None,
                 color_attachments: &[Some(wgpu::RenderPassColorAttachment {
-                    view: &monitor.rendering.ms_tex,
+                    view: &rendering.ms_tex,
                     resolve_target: None,
                     ops: wgpu::Operations {
                         load: wgpu::LoadOp::Clear(wgpu::Color::TRANSPARENT),
@@ -296,21 +300,21 @@ impl Renderer {
                 depth_stencil_attachment: None,
             });
             render_pass.set_pipeline(&self.overlay_pipeline);
-            render_pass.set_vertex_buffer(0, monitor.rendering.shade_vertex_buffer.slice(..));
+            render_pass.set_vertex_buffer(0, rendering.shade_vertex_buffer.slice(..));
             render_pass.set_index_buffer(
-                monitor.rendering.shade_index_buffer.slice(..),
+                rendering.shade_index_buffer.slice(..),
                 wgpu::IndexFormat::Uint32,
             );
             render_pass.set_bind_group(0, &self.shade_bind_group, &[]);
-            render_pass.draw_indexed(0..monitor.rendering.shade_index_count, 0, 0..1);
+            render_pass.draw_indexed(0..rendering.shade_index_count, 0, 0..1);
         }
         // Draw the selection outline to the multisampling texture, and resolve it to the resolve texture
         {
             let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
                 label: None,
                 color_attachments: &[Some(wgpu::RenderPassColorAttachment {
-                    view: &monitor.rendering.ms_tex,
-                    resolve_target: Some(&monitor.rendering.ms_resolve_target_tex),
+                    view: &rendering.ms_tex,
+                    resolve_target: Some(&rendering.ms_resolve_target_tex),
                     ops: wgpu::Operations {
                         load: wgpu::LoadOp::Load,
                         store: false,
@@ -319,13 +323,13 @@ impl Renderer {
                 depth_stencil_attachment: None,
             });
             render_pass.set_pipeline(&self.overlay_pipeline);
-            render_pass.set_vertex_buffer(0, monitor.rendering.sel_vertex_buffer.slice(..));
+            render_pass.set_vertex_buffer(0, rendering.sel_vertex_buffer.slice(..));
             render_pass.set_index_buffer(
-                monitor.rendering.sel_index_buffer.slice(..),
+                rendering.sel_index_buffer.slice(..),
                 wgpu::IndexFormat::Uint32,
             );
             render_pass.set_bind_group(0, &self.sel_bind_group, &[]);
-            render_pass.draw_indexed(0..monitor.rendering.sel_index_count, 0, 0..1);
+            render_pass.draw_indexed(0..rendering.sel_index_count, 0, 0..1);
         }
         // Draw the resolve target texture on top
         {
@@ -343,21 +347,17 @@ impl Renderer {
             });
             render_pass.set_pipeline(&self.tex_pipeline);
             render_pass.set_vertex_buffer(0, self.tex_vertex_buffer.slice(..));
-            render_pass.set_bind_group(0, &monitor.rendering.ms_bind_group, &[]);
+            render_pass.set_bind_group(0, &rendering.ms_bind_group, &[]);
             render_pass.draw(0..6, 0..1);
         }
 
         if let Some(section) = match selection {
-            Selection::Rectangle(None) => Some(&monitor.rendering.rect_mode_section),
-            Selection::Display(None) => Some(&monitor.rendering.display_mode_section),
-            Selection::Window(None) => Some(&monitor.rendering.window_mode_section),
+            Selection::Rectangle(None) => Some(&rendering.rect_mode_section),
+            Selection::Display(None) => Some(&rendering.display_mode_section),
+            Selection::Window(None) => Some(&rendering.window_mode_section),
             _ => None,
         } {
-            monitor
-                .rendering
-                .brush
-                .queue(device, queue, vec![section])
-                .unwrap();
+            rendering.brush.queue(device, queue, vec![section]).unwrap();
 
             let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
                 label: None,
@@ -372,7 +372,7 @@ impl Renderer {
                 depth_stencil_attachment: None,
             });
 
-            monitor.rendering.brush.draw(&mut render_pass);
+            rendering.brush.draw(&mut render_pass);
         }
     }
 }
@@ -381,6 +381,7 @@ impl MonSpecificRendering {
     pub fn new(
         rect: &Rect<i32>,
         info: &OutputInfo,
+        format: wgpu::TextureFormat,
         background: RgbaImage,
         runtime_data: &RuntimeData,
     ) -> Self {
@@ -425,7 +426,7 @@ impl MonSpecificRendering {
             .device
             .create_bind_group(&wgpu::BindGroupDescriptor {
                 label: None,
-                layout: &runtime_data.renderer.tex_layout,
+                layout: &runtime_data.renderer.as_ref().unwrap().tex_layout,
                 entries: &[
                     wgpu::BindGroupEntry {
                         binding: 0,
@@ -434,7 +435,7 @@ impl MonSpecificRendering {
                     wgpu::BindGroupEntry {
                         binding: 1,
                         resource: wgpu::BindingResource::Sampler(
-                            &runtime_data.renderer.tex_sampler,
+                            &runtime_data.renderer.as_ref().unwrap().tex_sampler,
                         ),
                     },
                 ],
@@ -482,7 +483,7 @@ impl MonSpecificRendering {
                 mip_level_count: 1,
                 sample_count: OVERLAY_MSAA,
                 dimension: wgpu::TextureDimension::D2,
-                format: wgpu::TextureFormat::Bgra8UnormSrgb,
+                format,
                 usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
                 view_formats: &[],
             })
@@ -496,7 +497,7 @@ impl MonSpecificRendering {
                 mip_level_count: 1,
                 sample_count: 1,
                 dimension: wgpu::TextureDimension::D2,
-                format: wgpu::TextureFormat::Bgra8UnormSrgb,
+                format,
                 usage: wgpu::TextureUsages::RENDER_ATTACHMENT
                     | wgpu::TextureUsages::TEXTURE_BINDING,
                 view_formats: &[],
@@ -507,7 +508,7 @@ impl MonSpecificRendering {
             .device
             .create_bind_group(&wgpu::BindGroupDescriptor {
                 label: None,
-                layout: &runtime_data.renderer.tex_layout,
+                layout: &runtime_data.renderer.as_ref().unwrap().tex_layout,
                 entries: &[
                     wgpu::BindGroupEntry {
                         binding: 0,
@@ -516,7 +517,7 @@ impl MonSpecificRendering {
                     wgpu::BindGroupEntry {
                         binding: 1,
                         resource: wgpu::BindingResource::Sampler(
-                            &runtime_data.renderer.tex_sampler,
+                            &runtime_data.renderer.as_ref().unwrap().tex_sampler,
                         ),
                     },
                 ],
@@ -526,7 +527,7 @@ impl MonSpecificRendering {
             &runtime_data.device,
             (rect.width * info.scale_factor) as u32,
             (rect.height * info.scale_factor) as u32,
-            wgpu::TextureFormat::Bgra8UnormSrgb,
+            format,
         );
         let pos = (
             (rect.width * info.scale_factor) as f32 / 2.0,
