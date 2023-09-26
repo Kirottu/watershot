@@ -26,5 +26,5 @@ pollster = "0.3.0"
 bytemuck = { version = "1.13.1", features = ["derive"] }
 wgpu_text = "0.8.3"
 regex = "1.9.1"
-hyprland = "0.3.8"
+hyprland = "0.3.12"
 strum = { version = "0.25.0", features = ["derive", "strum_macros"] }
