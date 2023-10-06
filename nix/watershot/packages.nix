@@ -22,6 +22,7 @@ in {
     nativeBuildInputs = with nixpkgs; [
       pkg-config
       makeWrapper
+      wayland
     ];
 
     buildInputs = with nixpkgs; [

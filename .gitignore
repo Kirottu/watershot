@@ -1,5 +1,10 @@
 /target
-result
+/result*
+.envrc
+
+# PRJ
+/.data
+/.cache
 
 # nixago: ignore-linked-files
 /treefmt.toml

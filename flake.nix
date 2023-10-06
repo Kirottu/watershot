@@ -3,9 +3,14 @@
 
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixpkgs-unstable";
+
+    devshell.url = "github:numtide/devshell";
+    nixago.url = "github:nix-community/nixago";
     std = {
       url = "github:divnix/std";
       inputs.nixpkgs.follows = "nixpkgs";
+      inputs.devshell.follows = "devshell";
+      inputs.nixago.follows = "nixago";
     };
   };
 
