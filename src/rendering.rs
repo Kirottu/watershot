@@ -787,7 +787,7 @@ struct TexVertex {
 }
 
 impl TexVertex {
-    const RECT_VERTICES: &[Self] = &[
+    const RECT_VERTICES: &'static [Self] = &[
         // Upper left triangle
         Self {
             position: TOP_LEFT,
