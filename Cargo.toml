@@ -14,7 +14,7 @@ image = { version = "0.24.5", default-features = false, features = ["pnm", "farb
 ron = "0.8.0"
 serde = { version = "1.0.152", features = ["derive"] }
 fontconfig = "0.6.0"
-wl-clipboard-rs = "0.7.0"
+wl-clipboard-rs = "0.9.0"
 nix = { version = "0.26.1", default-features = false, features = ["process"] }
 clap = { version = "4.0.32", features = ["derive"] }
 chrono = "0.4.23"
